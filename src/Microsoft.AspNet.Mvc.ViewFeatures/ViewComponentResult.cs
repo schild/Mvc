@@ -4,6 +4,7 @@
 using System;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.AspNet.Mvc.Internal;
 using Microsoft.AspNet.Mvc.Logging;
 using Microsoft.AspNet.Mvc.ModelBinding;
 using Microsoft.AspNet.Mvc.Rendering;
@@ -89,33 +90,19 @@ namespace Microsoft.AspNet.Mvc
             {
                 tempData = services.GetRequiredService<ITempDataDictionary>();
             }
+            var contentType = ResponseContentTypeHelper.GetContentType(
+                ContentType,
+                response.ContentType,
+                ViewExecutor.DefaultContentType);
 
-            var contentType = ContentType;
-            if (contentType != null && contentType.Encoding == null)
-            {
-                // Do not modify the user supplied content type, so copy it instead
-                contentType = contentType.Copy();
-                contentType.Encoding = Encoding.UTF8;
-            }
-
-            // Priority list for setting content-type/encoding:
-            //      1. this.ContentType (set by the user on the result)
-            //      2. response.ContentType (likely set by the user in controller code)
-            //      3. ViewExecutor.DefaultContentType (sensible default)
-            //
-            //
-            response.ContentType =
-                contentType?.ToString() ??
-                response.ContentType ??
-                ViewExecutor.DefaultContentType.ToString();
+            response.ContentType = contentType.ToString();
 
             if (StatusCode != null)
             {
                 response.StatusCode = StatusCode.Value;
             }
 
-            var encoding = contentType?.Encoding ?? ViewExecutor.DefaultContentType?.Encoding;
-            using (var writer = new HttpResponseStreamWriter(response.Body, encoding))
+            using (var writer = new HttpResponseStreamWriter(response.Body, contentType.Encoding))
             {
                 var viewContext = new ViewContext(
                     context,

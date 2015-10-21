@@ -41,35 +41,45 @@ namespace Microsoft.AspNet.Mvc.ViewFeatures
                         "text/foo; charset=utf-8"
                     },
                     {
+                        MediaTypeHeaderValue.Parse("text/foo; charset=us-ascii"),
+                        null,
+                        "text/foo; charset=us-ascii"
+                    },
+                    {
                         MediaTypeHeaderValue.Parse("text/foo; p1=p1-value"),
                         null,
                         "text/foo; p1=p1-value; charset=utf-8"
                     },
                     {
-                        new MediaTypeHeaderValue("text/foo") { Charset = "us-ascii" },
+                        MediaTypeHeaderValue.Parse("text/foo; p1=p1-value; charset=us-ascii"),
                         null,
-                        "text/foo; charset=us-ascii"
+                        "text/foo; p1=p1-value; charset=us-ascii"
                     },
                     {
                         null,
                         "text/bar",
-                        "text/bar"
+                        "text/bar; charset=utf-8"
                     },
                     {
                         null,
-                        "application/xml; charset=us-ascii",
-                        "application/xml; charset=us-ascii"
+                        "text/bar; p1=p1-value",
+                        "text/bar; p1=p1-value; charset=utf-8"
                     },
-                    {
+                                        {
                         null,
-                        "Invalid content type",
-                        "Invalid content type"
+                        "text/bar; p1=p1-value; charset=us-ascii",
+                        "text/bar; p1=p1-value; charset=us-ascii"
                     },
                     {
-                        new MediaTypeHeaderValue("text/foo") { Charset = "us-ascii" },
+                        MediaTypeHeaderValue.Parse("text/foo; charset=us-ascii"),
                         "text/bar",
                         "text/foo; charset=us-ascii"
                     },
+                    {
+                        MediaTypeHeaderValue.Parse("text/foo; charset=us-ascii"),
+                        "text/bar; charset=utf-8",
+                        "text/foo; charset=us-ascii"
+                    }
                 };
             }
         }
@@ -197,7 +207,7 @@ namespace Microsoft.AspNet.Mvc.ViewFeatures
                 view,
                 viewData,
                 Mock.Of<ITempDataDictionary>(),
-                contentType: null,
+                actionResultContentType: null,
                 statusCode: 500);
 
             // Assert
@@ -237,7 +247,7 @@ namespace Microsoft.AspNet.Mvc.ViewFeatures
                 view,
                 viewData,
                 Mock.Of<ITempDataDictionary>(),
-                contentType: null,
+                actionResultContentType: null,
                 statusCode: null);
 
             // Assert
@@ -280,7 +290,7 @@ namespace Microsoft.AspNet.Mvc.ViewFeatures
                 view.Object,
                 viewData,
                 Mock.Of<ITempDataDictionary>(),
-                contentType: null,
+                actionResultContentType: null,
                 statusCode: null));
 
             // Assert
@@ -319,7 +329,7 @@ namespace Microsoft.AspNet.Mvc.ViewFeatures
                 view,
                 viewData,
                 Mock.Of<ITempDataDictionary>(),
-                contentType: null,
+                actionResultContentType: null,
                 statusCode: null);
 
             // Assert
