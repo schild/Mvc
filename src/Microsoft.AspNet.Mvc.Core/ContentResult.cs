@@ -48,26 +48,26 @@ namespace Microsoft.AspNet.Mvc
 
             var response = context.HttpContext.Response;
 
-            var contentTypeHeader = ResponseContentTypeHelper.GetContentType(
+            var contentTypeHeader = ResponseContentTypeHelper.GetResponseContentTypeAndEncoding(
                 ContentType,
                 response.ContentType,
                 DefaultContentType);
 
-            response.ContentType = contentTypeHeader.ToString();
+            response.ContentType = contentTypeHeader.Item1;
 
             if (StatusCode != null)
             {
                 response.StatusCode = StatusCode.Value;
             }
 
-            logger.ContentResultExecuting(contentTypeHeader);
+            logger.ContentResultExecuting(contentTypeHeader.Item1);
 
             if (Content != null)
             {
                 var bufferingFeature = response.HttpContext.Features.Get<IHttpBufferingFeature>();
                 bufferingFeature?.DisableResponseBuffering();
 
-                return response.WriteAsync(Content, contentTypeHeader.Encoding);
+                return response.WriteAsync(Content, contentTypeHeader.Item2);
             }
 
             return TaskCache.CompletedTask;

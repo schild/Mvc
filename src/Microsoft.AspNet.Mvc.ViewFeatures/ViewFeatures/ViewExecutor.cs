@@ -136,19 +136,19 @@ namespace Microsoft.AspNet.Mvc.ViewFeatures
 
             var response = actionContext.HttpContext.Response;
 
-            var resolvedContentType = ResponseContentTypeHelper.GetContentType(
+            var resolvedContentType = ResponseContentTypeHelper.GetResponseContentTypeAndEncoding(
                 actionResultContentType,
                 response.ContentType,
                 DefaultContentType);
 
-            response.ContentType = resolvedContentType.ToString();
+            response.ContentType = resolvedContentType.Item1;
 
             if (statusCode != null)
             {
                 response.StatusCode = statusCode.Value;
             }
 
-            using (var writer = WriterFactory.CreateWriter(response.Body, resolvedContentType.Encoding))
+            using (var writer = WriterFactory.CreateWriter(response.Body, resolvedContentType.Item2))
             {
                 var viewContext = new ViewContext(
                     actionContext,

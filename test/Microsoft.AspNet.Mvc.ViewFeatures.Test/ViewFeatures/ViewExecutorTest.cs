@@ -38,7 +38,7 @@ namespace Microsoft.AspNet.Mvc.ViewFeatures
                     {
                         new MediaTypeHeaderValue("text/foo"),
                         null,
-                        "text/foo; charset=utf-8"
+                        "text/foo"
                     },
                     {
                         MediaTypeHeaderValue.Parse("text/foo; charset=us-ascii"),
@@ -48,7 +48,7 @@ namespace Microsoft.AspNet.Mvc.ViewFeatures
                     {
                         MediaTypeHeaderValue.Parse("text/foo; p1=p1-value"),
                         null,
-                        "text/foo; p1=p1-value; charset=utf-8"
+                        "text/foo; p1=p1-value"
                     },
                     {
                         MediaTypeHeaderValue.Parse("text/foo; p1=p1-value; charset=us-ascii"),
@@ -58,12 +58,12 @@ namespace Microsoft.AspNet.Mvc.ViewFeatures
                     {
                         null,
                         "text/bar",
-                        "text/bar; charset=utf-8"
+                        "text/bar"
                     },
                     {
                         null,
                         "text/bar; p1=p1-value",
-                        "text/bar; p1=p1-value; charset=utf-8"
+                        "text/bar; p1=p1-value"
                     },
                                         {
                         null,
@@ -160,7 +160,7 @@ namespace Microsoft.AspNet.Mvc.ViewFeatures
                 context,
                 new RouteData(),
                 new ActionDescriptor());
-            
+
             context.RequestServices = GetServiceProvider();
             var viewExecutor = CreateViewExecutor();
 
@@ -170,7 +170,7 @@ namespace Microsoft.AspNet.Mvc.ViewFeatures
                 view,
                 null,
                 null,
-                contentType: null,
+                actionResultContentType: null,
                 statusCode: 200);
 
             // Assert

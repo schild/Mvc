@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Text;
 using Microsoft.Net.Http.Headers;
 using Xunit;
 
@@ -13,6 +14,7 @@ namespace Microsoft.AspNet.Mvc.Internal
         {
             get
             {
+                // contentType, responseContentType, expectedContentType
                 return new TheoryData<MediaTypeHeaderValue, string, string>
                 {
                     {
@@ -23,7 +25,7 @@ namespace Microsoft.AspNet.Mvc.Internal
                     {
                         new MediaTypeHeaderValue("text/foo"),
                         null,
-                        "text/foo; charset=utf-8"
+                        "text/foo"
                     },
                     {
                         MediaTypeHeaderValue.Parse("text/foo; charset=us-ascii"),
@@ -33,7 +35,7 @@ namespace Microsoft.AspNet.Mvc.Internal
                     {
                         MediaTypeHeaderValue.Parse("text/foo; p1=p1-value"),
                         null,
-                        "text/foo; p1=p1-value; charset=utf-8"
+                        "text/foo; p1=p1-value"
                     },
                     {
                         MediaTypeHeaderValue.Parse("text/foo; p1=p1-value; charset=us-ascii"),
@@ -43,12 +45,12 @@ namespace Microsoft.AspNet.Mvc.Internal
                     {
                         null,
                         "text/bar",
-                        "text/bar; charset=utf-8"
+                        "text/bar"
                     },
                     {
                         null,
                         "text/bar; p1=p1-value",
-                        "text/bar; p1=p1-value; charset=utf-8"
+                        "text/bar; p1=p1-value"
                     },
                                         {
                         null,
@@ -80,31 +82,31 @@ namespace Microsoft.AspNet.Mvc.Internal
             var defaultContentType = MediaTypeHeaderValue.Parse("text/default; p1=p1-value; charset=utf-8");
 
             // Act
-            var actualContentType = ResponseContentTypeHelper.GetContentType(
+            var actualContentType = ResponseContentTypeHelper.GetResponseContentTypeAndEncoding(
                 contentType,
                 responseContentType,
                 defaultContentType);
 
             // Assert
-            Assert.Equal(expectedContentType, actualContentType.ToString());
+            Assert.Equal(expectedContentType, actualContentType.Item1);
         }
 
         [Fact]
-        public void DoesNotModify_UserProvidedContentTypeObject()
+        public void DoesNotThrowException_OnInvalidResponseContentType()
         {
             // Arrange
-            var defaultContentType = MediaTypeHeaderValue.Parse("text/blah; charset=utf-8");
-            var contentType = MediaTypeHeaderValue.Parse("text/foo");
+            var expectedContentType = "invalid-content-type";
+            var defaultContentType = MediaTypeHeaderValue.Parse("text/plain; charset=utf-8");
 
             // Act
-            var actualContentType = ResponseContentTypeHelper.GetContentType(
-                contentType,
-                httpResponseContentType: null,
+            var actualContentType = ResponseContentTypeHelper.GetResponseContentTypeAndEncoding(
+                actionResultContentType: null,
+                httpResponseContentType: expectedContentType,
                 defaultContentType: defaultContentType);
 
             // Assert
-            Assert.Equal("text/foo; charset=utf-8", actualContentType.ToString());
-            Assert.NotSame(contentType, actualContentType);
+            Assert.Equal(expectedContentType, actualContentType.Item1);
+            Assert.Equal(Encoding.UTF8, actualContentType.Item2);
         }
 
         public static TheoryData<MediaTypeHeaderValue, string> ThrowsExceptionOnNullDefaultContentTypeData
@@ -142,7 +144,7 @@ namespace Microsoft.AspNet.Mvc.Internal
             // Arrange, Act & Assert
             var exception = Assert.Throws<ArgumentNullException>(() =>
             {
-                ResponseContentTypeHelper.GetContentType(
+                ResponseContentTypeHelper.GetResponseContentTypeAndEncoding(
                     actionResultContentType,
                     httpResponseContentType,
                     defaultContentType: null);
@@ -185,9 +187,9 @@ namespace Microsoft.AspNet.Mvc.Internal
             var defaultContentType = MediaTypeHeaderValue.Parse("text/bar; p1=p1-value");
 
             // Act & Assert
-            var exception = Assert.Throws<InvalidOperationException>(() =>
+            var exception = Assert.Throws<ArgumentException>(() =>
             {
-                ResponseContentTypeHelper.GetContentType(
+                ResponseContentTypeHelper.GetResponseContentTypeAndEncoding(
                     actionResultContentType,
                     httpResponseContentType,
                     defaultContentType);

@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Text;
 using Microsoft.AspNet.Mvc.Core;
 using Microsoft.Net.Http.Headers;
 
@@ -9,7 +10,7 @@ namespace Microsoft.AspNet.Mvc.Internal
 {
     public static class ResponseContentTypeHelper
     {
-        public static MediaTypeHeaderValue GetContentType(
+        public static Tuple<string, Encoding> GetResponseContentTypeAndEncoding(
             MediaTypeHeaderValue actionResultContentType,
             string httpResponseContentType,
             MediaTypeHeaderValue defaultContentType)
@@ -21,34 +22,36 @@ namespace Microsoft.AspNet.Mvc.Internal
 
             if (defaultContentType.Encoding == null)
             {
-                throw new InvalidOperationException(
+                throw new ArgumentException(
                     Resources.FormatDefaultContentTypeMustHaveEncoding(defaultContentType.ToString()));
             }
 
             // 1. User sets the ContentType property on the action result
             if (actionResultContentType != null)
             {
-                if (actionResultContentType.Encoding == null)
-                {
-                    // Do not modify the user supplied content type, so copy it instead
-                    var contentType = actionResultContentType.Copy();
-                    contentType.Encoding = defaultContentType.Encoding;
-                    return contentType;
-                }
-
-                return actionResultContentType;
+                return new Tuple<string, Encoding>(
+                    actionResultContentType.ToString(),
+                    actionResultContentType.Encoding ?? defaultContentType.Encoding);
             }
 
             // 2. User sets the ContentType property on the http response directly
             if (!string.IsNullOrEmpty(httpResponseContentType))
             {
-                var contentType = MediaTypeHeaderValue.Parse(httpResponseContentType);
-                contentType.Encoding = contentType.Encoding ?? defaultContentType.Encoding;
-                return contentType;
+                MediaTypeHeaderValue mediaType;
+                if (MediaTypeHeaderValue.TryParse(httpResponseContentType, out mediaType))
+                {
+                    return new Tuple<string, Encoding>(
+                        httpResponseContentType,
+                        mediaType.Encoding ?? defaultContentType.Encoding);
+                }
+                else
+                {
+                    return new Tuple<string, Encoding>(httpResponseContentType, defaultContentType.Encoding);
+                }
             }
 
             // 3. Fall-back to the default content type
-            return defaultContentType;
+            return new Tuple<string, Encoding>(defaultContentType.ToString(), defaultContentType.Encoding);
         }
     }
 }

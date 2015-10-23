@@ -42,7 +42,7 @@ namespace Microsoft.AspNet.Mvc
             };
 
             var actionContext = CreateActionContext(descriptor);
-            
+
             var viewComponentResult = new ViewComponentResult
             {
                 Arguments = new object[] { "World!" },
@@ -338,11 +338,11 @@ namespace Microsoft.AspNet.Mvc
                     },
                     {
                         new MediaTypeHeaderValue("text/foo"),
-                        "text/foo; charset=utf-8"
+                        "text/foo"
                     },
                     {
                         MediaTypeHeaderValue.Parse("text/foo;p1=p1-value"),
-                        "text/foo; p1=p1-value; charset=utf-8"
+                        "text/foo; p1=p1-value"
                     },
                     {
                         new MediaTypeHeaderValue("text/foo") { Encoding = Encoding.ASCII },
@@ -457,7 +457,7 @@ namespace Microsoft.AspNet.Mvc
         }
 
         private IServiceCollection CreateServices(object diagnosticListener, HttpContext context, params ViewComponentDescriptor[] descriptors)
-        { 
+        {
             var httpContext = new HttpContextAccessor() { HttpContext = context };
             var tempDataProvider = new SessionStateTempDataProvider();
             var diagnosticSource = new DiagnosticListener("Microsoft.AspNet");
