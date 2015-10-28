@@ -1,4 +1,4 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -9,78 +9,35 @@ using Microsoft.AspNet.Mvc.Core;
 using Microsoft.AspNet.Mvc.Internal.Routing;
 using Microsoft.AspNet.Mvc.Logging;
 using Microsoft.AspNet.Routing;
-using Microsoft.AspNet.Routing.Template;
+using Microsoft.AspNet.Routing.Internal;
+using Microsoft.Extensions.Internal;
 using Microsoft.Extensions.Logging;
 
 namespace Microsoft.AspNet.Mvc.Routing
 {
-    /// <summary>
-    /// An <see cref="IRouter"/> implementation for attribute routing.
-    /// </summary>
-    public class InnerAttributeRoute : IRouter
+    public class TreeRouter : IRouter
     {
         private readonly IRouter _next;
         private readonly LinkGenerationDecisionTree _linkGenerationTree;
-        private readonly AttributeRouteMatchingEntry[] _matchingEntries;
+        private readonly UrlMatchingTree[] _trees;
         private readonly IDictionary<string, AttributeRouteLinkGenerationEntry> _namedEntries;
 
-        private ILogger _logger;
-        private ILogger _constraintLogger;
+        // Left as an exercise to the reader.
+        private readonly ILogger _logger;
+        private readonly ILogger _constraintLogger;
 
-        /// <summary>
-        /// Creates a new <see cref="InnerAttributeRoute"/>.
-        /// </summary>
-        /// <param name="next">The next router. Invoked when a route entry matches.</param>
-        /// <param name="entries">The set of route entries.</param>
-        public InnerAttributeRoute(
+        public TreeRouter(
             IRouter next,
-            IEnumerable<AttributeRouteMatchingEntry> matchingEntries,
+            UrlMatchingTree[] trees,
             IEnumerable<AttributeRouteLinkGenerationEntry> linkGenerationEntries,
-            ILogger logger,
+            ILogger routeLogger,
             ILogger constraintLogger,
             int version)
         {
-            if (next == null)
-            {
-                throw new ArgumentNullException(nameof(next));
-            }
-
-            if (matchingEntries == null)
-            {
-                throw new ArgumentNullException(nameof(matchingEntries));
-            }
-
-            if (linkGenerationEntries == null)
-            {
-                throw new ArgumentNullException(nameof(linkGenerationEntries));
-            }
-
-            if (logger == null)
-            {
-                throw new ArgumentNullException(nameof(logger));
-            }
-
-            if (constraintLogger == null)
-            {
-                throw new ArgumentNullException(nameof(constraintLogger));
-            }
-
             _next = next;
-            _logger = logger;
+            _trees = trees;
+            _logger = routeLogger;
             _constraintLogger = constraintLogger;
-
-            Version = version;
-
-            // Order all the entries by order, then precedence, and then finally by template in order to provide
-            // a stable routing and link generation order for templates with same order and precedence.
-            // We use ordinal comparison for the templates because we only care about them being exactly equal and
-            // we don't want to make any equivalence between templates based on the culture of the machine.
-
-            _matchingEntries = matchingEntries
-                .OrderBy(o => o.Order)
-                .ThenBy(e => e.Precedence)
-                .ThenBy(e => e.RouteTemplate, StringComparer.Ordinal)
-                .ToArray();
 
             var namedEntries = new Dictionary<string, AttributeRouteLinkGenerationEntry>(
                 StringComparer.OrdinalIgnoreCase);
@@ -114,76 +71,210 @@ namespace Microsoft.AspNet.Mvc.Routing
 
             // The decision tree will take care of ordering for these entries.
             _linkGenerationTree = new LinkGenerationDecisionTree(linkGenerationEntries.ToArray());
+
+            Version = version;
         }
 
-        /// <summary>
-        /// Gets the version of this route. This corresponds to the value of
-        /// <see cref="Infrastructure.ActionDescriptorsCollection.Version"/> when this route was created.
-        /// </summary>
         public int Version { get; }
 
-        /// <inheritdoc />
         public async Task RouteAsync(RouteContext context)
         {
-            if (context == null)
+            var match = default(TemplateMatch);
+            foreach (var tree in _trees)
             {
-                throw new ArgumentNullException(nameof(context));
-            }
+                var tokenizer = new PathTokenizer(context.HttpContext.Request.Path);
+                var enumerator = tokenizer.GetEnumerator();
+                var current = tree.Root;
 
-            foreach (var matchingEntry in _matchingEntries)
-            {
-                var requestPath = context.HttpContext.Request.Path;
-                var values = matchingEntry.TemplateMatcher.Match(requestPath);
-                if (values == null)
-                {
-                    // If we got back a null value set, that means the URI did not match
-                    continue;
-                }
-
-                var oldRouteData = context.RouteData;
-
-                var newRouteData = new RouteData(oldRouteData);
-                newRouteData.Routers.Add(matchingEntry.Target);
-                MergeValues(newRouteData.Values, values);
-
-                if (!RouteConstraintMatcher.Match(
-                    matchingEntry.Constraints,
-                    newRouteData.Values,
-                    context.HttpContext,
-                    this,
-                    RouteDirection.IncomingRequest,
-                    _constraintLogger))
-                {
-                    continue;
-                }
-
-                _logger.MatchedRouteName(
-                    matchingEntry.RouteName,
-                    matchingEntry.RouteTemplate);
-
-                try
-                {
-                    context.RouteData = newRouteData;
-
-                    await matchingEntry.Target.RouteAsync(context);
-                }
-                finally
-                {
-                    // Restore the original values to prevent polluting the route data.
-                    if (!context.IsHandled)
-                    {
-                        context.RouteData = oldRouteData;
-                    }
-                }
-
-                if (context.IsHandled)
+                if ((match = Match(context, current, enumerator)) != default(TemplateMatch))
                 {
                     break;
                 }
             }
+
+            if (match == default(TemplateMatch))
+            {
+                return;
+            }
+
+            var oldRouteData = context.RouteData;
+
+            var newRouteData = new RouteData(oldRouteData);
+
+
+            newRouteData.Routers.Add(match.Entry.Target);
+            MergeValues(newRouteData.Values, match.Values);
+
+            if (!RouteConstraintMatcher.Match(
+                match.Entry.Constraints,
+                newRouteData.Values,
+                context.HttpContext,
+                this,
+                RouteDirection.IncomingRequest,
+                _constraintLogger))
+            {
+                return;
+            }
+
+            _logger.LogVerbose(
+                "Request successfully matched the route with name '{RouteName}' and template '{RouteTemplate}'.",
+                match.Entry.RouteName,
+                match.Entry.RouteTemplate);
+
+            try
+            {
+                context.RouteData = newRouteData;
+
+                await match.Entry.Target.RouteAsync(context);
+            }
+            finally
+            {
+                // Restore the original values to prevent polluting the route data.
+                if (!context.IsHandled)
+                {
+                    context.RouteData = oldRouteData;
+                }
+            }
         }
 
-        /// <inheritdoc />
+        private TemplateMatch Match(RouteContext context, UrlMatchingNode current, PathTokenizer.Enumerator enumerator)
+        {
+            if (!enumerator.MoveNext())
+            {
+                // We've reached the end of the Path. Check the matches.
+                foreach (var match in current.Matches)
+                {
+                    // We may want to build something more efficient than TemplateMatcher.
+                    // We already test all the literals, and that the shape matches, and that doesn't
+                    // need to be redone.
+                    var values = match.TemplateMatcher.Match(context.HttpContext.Request.Path);
+                    if (values != null)
+                    {
+                        return new TemplateMatch(match, values);
+                    }
+                }
+
+                return default(TemplateMatch);
+            }
+
+            // Go through different types of matches in precedence order
+            if (current.Literals.Count > 0)
+            {
+                // This code needs to use PathSegment to avoid allocations. I'd recommend a binary search
+                // with a list. This is left as an exercise to the reader.
+                var segment = enumerator.Current.ToString();
+
+                UrlMatchingNode next;
+                if (current.Literals.TryGetValue(segment, out next))
+                {
+                    var match = Match(context, next, enumerator);
+                    if (match != default(TemplateMatch))
+                    {
+                        return match;
+                    }
+                }
+            }
+
+            if (current.ConstrainedParameters != null)
+            {
+                var match = Match(context, current.ConstrainedParameters, enumerator);
+                if (match != default(TemplateMatch))
+                {
+                    return match;
+                }
+            }
+
+            if (current.Parameters != null)
+            {
+                var match = Match(context, current.Parameters, enumerator);
+                if (match != default(TemplateMatch))
+                {
+                    return match;
+                }
+            }
+
+            if (current.ConstrainedCatchAlls != null)
+            {
+                var match = Match(context, current.ConstrainedCatchAlls, enumerator);
+                if (match != default(TemplateMatch))
+                {
+                    return match;
+                }
+            }
+
+            if (current.CatchAlls != null)
+            {
+                var match = Match(context, current.CatchAlls, enumerator);
+                if (match != default(TemplateMatch))
+                {
+                    return match;
+                }
+            }
+
+            return default(TemplateMatch);
+        }
+
+        private static void MergeValues(
+            IDictionary<string, object> destination,
+            IDictionary<string, object> values)
+        {
+            foreach (var kvp in values)
+            {
+                // This will replace the original value for the specified key.
+                // Values from the matched route will take preference over previous
+                // data in the route context.
+                destination[kvp.Key] = kvp.Value;
+            }
+        }
+
+        private struct TemplateMatch : IEquatable<TemplateMatch>
+        {
+            public TemplateMatch(UrlMatchingEntry entry, IDictionary<string, object> values)
+            {
+                Entry = entry;
+                Values = values;
+            }
+
+            public UrlMatchingEntry Entry { get; }
+
+            public IDictionary<string, object> Values { get; }
+
+            public override bool Equals(object obj)
+            {
+                if (obj is TemplateMatch)
+                {
+                    return Equals((TemplateMatch)obj);
+                }
+
+                return false;
+            }
+
+            public bool Equals(TemplateMatch other)
+            {
+                return
+                    object.ReferenceEquals(Entry, other.Entry) &&
+                    object.ReferenceEquals(Values, other.Values);
+            }
+
+            public override int GetHashCode()
+            {
+                var hash = new HashCodeCombiner();
+                hash.Add(Entry);
+                hash.Add(Values);
+                return hash.CombinedHash;
+            }
+
+            public static bool operator ==(TemplateMatch left, TemplateMatch right)
+            {
+                return left.Equals(right);
+            }
+
+            public static bool operator !=(TemplateMatch left, TemplateMatch right)
+            {
+                return !left.Equals(right);
+            }
+        }
+
         public VirtualPathData GetVirtualPath(VirtualPathContext context)
         {
             if (context == null)
@@ -314,41 +405,6 @@ namespace Microsoft.AspNet.Mvc.Routing
             }
 
             return new VirtualPathData(this, path);
-        }
-
-        private static void MergeValues(
-                IDictionary<string, object> destination,
-                IDictionary<string, object> values)
-        {
-            foreach (var kvp in values)
-            {
-                if (kvp.Value != null)
-                {
-                    // This will replace the original value for the specified key.
-                    // Values from the matched route will take preference over previous
-                    // data in the route context.
-                    destination[kvp.Key] = kvp.Value;
-                }
-            }
-        }
-
-        private bool ContextHasSameValue(VirtualPathContext context, string key, object value)
-        {
-            object providedValue;
-            if (!context.Values.TryGetValue(key, out providedValue))
-            {
-                // If the required value is an 'empty' route value, then ignore ambient values.
-                // This handles a case where we're generating a link to an action like:
-                // { area = "", controller = "Home", action = "Index" }
-                //
-                // and the ambient values has a value for area.
-                if (value != null)
-                {
-                    context.AmbientValues.TryGetValue(key, out providedValue);
-                }
-            }
-
-            return TemplateBinder.RoutePartsEqual(providedValue, value);
         }
     }
 }
