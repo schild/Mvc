@@ -80,12 +80,16 @@ namespace Microsoft.AspNet.Mvc
 
             var response = context.HttpContext.Response;
 
-            var contentTypeHeader = ResponseContentTypeHelper.GetResponseContentTypeAndEncoding(
+            string resolvedContentType = null;
+            Encoding resolvedContentTypeEncoding = null;
+            ResponseContentTypeHelper.ResolveContentTypeAndEncoding(
                 ContentType,
                 response.ContentType,
-                DefaultContentType);
+                DefaultContentType,
+                out resolvedContentType,
+                out resolvedContentTypeEncoding);
 
-            response.ContentType = contentTypeHeader.Item1;
+            response.ContentType = resolvedContentType;
 
             if (StatusCode != null)
             {
@@ -104,7 +108,7 @@ namespace Microsoft.AspNet.Mvc
             }
 
             logger.JsonResultExecuting(Value);
-            using (var writer = new HttpResponseStreamWriter(response.Body, contentTypeHeader.Item2))
+            using (var writer = new HttpResponseStreamWriter(response.Body, resolvedContentTypeEncoding))
             {
                 using (var jsonWriter = new JsonTextWriter(writer))
                 {

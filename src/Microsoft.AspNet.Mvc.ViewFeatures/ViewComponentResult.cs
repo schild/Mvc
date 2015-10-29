@@ -90,19 +90,24 @@ namespace Microsoft.AspNet.Mvc
             {
                 tempData = services.GetRequiredService<ITempDataDictionary>();
             }
-            var contentType = ResponseContentTypeHelper.GetResponseContentTypeAndEncoding(
+
+            string resolvedContentType = null;
+            Encoding resolvedContentTypeEncoding = null;
+            ResponseContentTypeHelper.ResolveContentTypeAndEncoding(
                 ContentType,
                 response.ContentType,
-                ViewExecutor.DefaultContentType);
+                ViewExecutor.DefaultContentType,
+                out resolvedContentType,
+                out resolvedContentTypeEncoding);
 
-            response.ContentType = contentType.Item1;
+            response.ContentType = resolvedContentType;
 
             if (StatusCode != null)
             {
                 response.StatusCode = StatusCode.Value;
             }
 
-            using (var writer = new HttpResponseStreamWriter(response.Body, contentType.Item2))
+            using (var writer = new HttpResponseStreamWriter(response.Body, resolvedContentTypeEncoding))
             {
                 var viewContext = new ViewContext(
                     context,

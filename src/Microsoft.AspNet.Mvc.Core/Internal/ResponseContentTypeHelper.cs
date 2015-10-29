@@ -10,10 +10,12 @@ namespace Microsoft.AspNet.Mvc.Internal
 {
     public static class ResponseContentTypeHelper
     {
-        public static Tuple<string, Encoding> GetResponseContentTypeAndEncoding(
+        public static void ResolveContentTypeAndEncoding(
             MediaTypeHeaderValue actionResultContentType,
             string httpResponseContentType,
-            MediaTypeHeaderValue defaultContentType)
+            MediaTypeHeaderValue defaultContentType,
+            out string resolvedResponseContentType,
+            out Encoding resolvedContentTypeEncoding)
         {
             if (defaultContentType == null)
             {
@@ -29,9 +31,9 @@ namespace Microsoft.AspNet.Mvc.Internal
             // 1. User sets the ContentType property on the action result
             if (actionResultContentType != null)
             {
-                return new Tuple<string, Encoding>(
-                    actionResultContentType.ToString(),
-                    actionResultContentType.Encoding ?? defaultContentType.Encoding);
+                resolvedResponseContentType = actionResultContentType.ToString();
+                resolvedContentTypeEncoding = actionResultContentType.Encoding ?? defaultContentType.Encoding;
+                return;
             }
 
             // 2. User sets the ContentType property on the http response directly
@@ -40,18 +42,21 @@ namespace Microsoft.AspNet.Mvc.Internal
                 MediaTypeHeaderValue mediaType;
                 if (MediaTypeHeaderValue.TryParse(httpResponseContentType, out mediaType))
                 {
-                    return new Tuple<string, Encoding>(
-                        httpResponseContentType,
-                        mediaType.Encoding ?? defaultContentType.Encoding);
+                    resolvedResponseContentType = httpResponseContentType;
+                    resolvedContentTypeEncoding = mediaType.Encoding ?? defaultContentType.Encoding;
                 }
                 else
                 {
-                    return new Tuple<string, Encoding>(httpResponseContentType, defaultContentType.Encoding);
+                    resolvedResponseContentType = httpResponseContentType;
+                    resolvedContentTypeEncoding = defaultContentType.Encoding;
                 }
+
+                return;
             }
 
             // 3. Fall-back to the default content type
-            return new Tuple<string, Encoding>(defaultContentType.ToString(), defaultContentType.Encoding);
+            resolvedResponseContentType = defaultContentType.ToString();
+            resolvedContentTypeEncoding = defaultContentType.Encoding;
         }
     }
 }

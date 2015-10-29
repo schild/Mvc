@@ -82,13 +82,17 @@ namespace Microsoft.AspNet.Mvc.Internal
             var defaultContentType = MediaTypeHeaderValue.Parse("text/default; p1=p1-value; charset=utf-8");
 
             // Act
-            var actualContentType = ResponseContentTypeHelper.GetResponseContentTypeAndEncoding(
+            string resolvedContentType = null;
+            Encoding resolvedContentTypeEncoding = null;
+            ResponseContentTypeHelper.ResolveContentTypeAndEncoding(
                 contentType,
                 responseContentType,
-                defaultContentType);
+                defaultContentType,
+                out resolvedContentType,
+                out resolvedContentTypeEncoding);
 
             // Assert
-            Assert.Equal(expectedContentType, actualContentType.Item1);
+            Assert.Equal(expectedContentType, resolvedContentType);
         }
 
         [Fact]
@@ -99,14 +103,18 @@ namespace Microsoft.AspNet.Mvc.Internal
             var defaultContentType = MediaTypeHeaderValue.Parse("text/plain; charset=utf-8");
 
             // Act
-            var actualContentType = ResponseContentTypeHelper.GetResponseContentTypeAndEncoding(
-                actionResultContentType: null,
-                httpResponseContentType: expectedContentType,
-                defaultContentType: defaultContentType);
+            string resolvedContentType = null;
+            Encoding resolvedContentTypeEncoding = null;
+            ResponseContentTypeHelper.ResolveContentTypeAndEncoding(
+                null,
+                expectedContentType,
+                defaultContentType,
+                out resolvedContentType,
+                out resolvedContentTypeEncoding);
 
             // Assert
-            Assert.Equal(expectedContentType, actualContentType.Item1);
-            Assert.Equal(Encoding.UTF8, actualContentType.Item2);
+            Assert.Equal(expectedContentType, resolvedContentType);
+            Assert.Equal(Encoding.UTF8, resolvedContentTypeEncoding);
         }
 
         public static TheoryData<MediaTypeHeaderValue, string> ThrowsExceptionOnNullDefaultContentTypeData
@@ -144,10 +152,14 @@ namespace Microsoft.AspNet.Mvc.Internal
             // Arrange, Act & Assert
             var exception = Assert.Throws<ArgumentNullException>(() =>
             {
-                ResponseContentTypeHelper.GetResponseContentTypeAndEncoding(
+                string resolvedContentType = null;
+                Encoding resolvedContentTypeEncoding = null;
+                ResponseContentTypeHelper.ResolveContentTypeAndEncoding(
                     actionResultContentType,
                     httpResponseContentType,
-                    defaultContentType: null);
+                    null, // default content type
+                    out resolvedContentType,
+                    out resolvedContentTypeEncoding);
             });
         }
 
@@ -189,10 +201,14 @@ namespace Microsoft.AspNet.Mvc.Internal
             // Act & Assert
             var exception = Assert.Throws<ArgumentException>(() =>
             {
-                ResponseContentTypeHelper.GetResponseContentTypeAndEncoding(
+                string resolvedContentType = null;
+                Encoding resolvedContentTypeEncoding = null;
+                ResponseContentTypeHelper.ResolveContentTypeAndEncoding(
                     actionResultContentType,
                     httpResponseContentType,
-                    defaultContentType);
+                    defaultContentType,
+                    out resolvedContentType,
+                    out resolvedContentTypeEncoding);
             });
             Assert.Equal(
                 $"The default content type '{defaultContentType.ToString()}' must have an encoding.",
