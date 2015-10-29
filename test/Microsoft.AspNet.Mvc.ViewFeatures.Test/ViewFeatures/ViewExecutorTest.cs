@@ -170,7 +170,7 @@ namespace Microsoft.AspNet.Mvc.ViewFeatures
                 view,
                 null,
                 null,
-                actionResultContentType: null,
+                contentType: null,
                 statusCode: 200);
 
             // Assert
@@ -207,7 +207,7 @@ namespace Microsoft.AspNet.Mvc.ViewFeatures
                 view,
                 viewData,
                 Mock.Of<ITempDataDictionary>(),
-                actionResultContentType: null,
+                contentType: null,
                 statusCode: 500);
 
             // Assert
@@ -247,7 +247,7 @@ namespace Microsoft.AspNet.Mvc.ViewFeatures
                 view,
                 viewData,
                 Mock.Of<ITempDataDictionary>(),
-                actionResultContentType: null,
+                contentType: null,
                 statusCode: null);
 
             // Assert
@@ -290,7 +290,7 @@ namespace Microsoft.AspNet.Mvc.ViewFeatures
                 view.Object,
                 viewData,
                 Mock.Of<ITempDataDictionary>(),
-                actionResultContentType: null,
+                contentType: null,
                 statusCode: null));
 
             // Assert
@@ -329,7 +329,7 @@ namespace Microsoft.AspNet.Mvc.ViewFeatures
                 view,
                 viewData,
                 Mock.Of<ITempDataDictionary>(),
-                actionResultContentType: null,
+                contentType: null,
                 statusCode: null);
 
             // Assert

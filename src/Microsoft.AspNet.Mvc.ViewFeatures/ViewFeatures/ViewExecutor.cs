@@ -96,7 +96,7 @@ namespace Microsoft.AspNet.Mvc.ViewFeatures
         /// <param name="view">The <see cref="IView"/>.</param>
         /// <param name="viewData">The <see cref="ViewDataDictionary"/>.</param>
         /// <param name="tempData">The <see cref="ITempDataDictionary"/>.</param>
-        /// <param name="actionResultContentType">
+        /// <param name="contentType">
         /// The content-type header value to set in the response. If <c>null</c>,
         /// <see cref="DefaultContentType"/> will be used.
         /// </param>
@@ -109,7 +109,7 @@ namespace Microsoft.AspNet.Mvc.ViewFeatures
             IView view,
             ViewDataDictionary viewData,
             ITempDataDictionary tempData,
-            MediaTypeHeaderValue actionResultContentType,
+            MediaTypeHeaderValue contentType,
             int? statusCode)
         {
             if (actionContext == null)
@@ -139,7 +139,7 @@ namespace Microsoft.AspNet.Mvc.ViewFeatures
             string resolvedContentType = null;
             Encoding resolvedContentTypeEncoding = null;
             ResponseContentTypeHelper.ResolveContentTypeAndEncoding(
-                actionResultContentType,
+                contentType,
                 response.ContentType,
                 DefaultContentType,
                 out resolvedContentType,
