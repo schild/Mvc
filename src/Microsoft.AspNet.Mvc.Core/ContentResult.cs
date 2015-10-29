@@ -48,8 +48,8 @@ namespace Microsoft.AspNet.Mvc
 
             var response = context.HttpContext.Response;
 
-            string resolvedContentType = null;
-            Encoding resolvedContentTypeEncoding = null;
+            string resolvedContentType;
+            Encoding resolvedContentTypeEncoding;
             ResponseContentTypeHelper.ResolveContentTypeAndEncoding(
                 ContentType,
                 response.ContentType,

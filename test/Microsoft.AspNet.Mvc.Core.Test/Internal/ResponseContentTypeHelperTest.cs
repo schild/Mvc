@@ -1,7 +1,6 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
-using System;
 using System.Text;
 using Microsoft.Net.Http.Headers;
 using Xunit;
@@ -17,46 +16,70 @@ namespace Microsoft.AspNet.Mvc.Internal
                 // contentType, responseContentType, expectedContentType
                 return new TheoryData<MediaTypeHeaderValue, string, string>
                 {
+                    // No explicit content type is provided, fall-back to the default content type
                     {
                         null,
                         null,
                         "text/default; p1=p1-value; charset=utf-8"
                     },
+
+                    // Content type is set explicitly without encoding on action result. No charset parameter added in
+                    // expected content type
                     {
                         new MediaTypeHeaderValue("text/foo"),
                         null,
                         "text/foo"
                     },
+
+                    // Content type is set explicitly with encoding on action result. Expected content type
+                    // has the charset
                     {
                         MediaTypeHeaderValue.Parse("text/foo; charset=us-ascii"),
                         null,
                         "text/foo; charset=us-ascii"
                     },
+
+                    // Content type is set explicitly without encoding and additional parameters on action result
+                    // Expected content type has the additional parameters but with no charset.
                     {
                         MediaTypeHeaderValue.Parse("text/foo; p1=p1-value"),
                         null,
                         "text/foo; p1=p1-value"
                     },
+
+                    // Content type is set explicitly with encoding and additional parameters on action result
+                    // Expected content type has the additional parameters and the charset.
                     {
                         MediaTypeHeaderValue.Parse("text/foo; p1=p1-value; charset=us-ascii"),
                         null,
                         "text/foo; p1=p1-value; charset=us-ascii"
                     },
+
+                    // Content type is set explicitly without encoding on http response.
+                    // No charset parameter added in expected content type
                     {
                         null,
                         "text/bar",
                         "text/bar"
                     },
+
+                    // Content type is set explicitly without encoding and additional parameters on http response
+                    // No charset parameter added in expected content type
                     {
                         null,
                         "text/bar; p1=p1-value",
                         "text/bar; p1=p1-value"
                     },
-                                        {
+
+                    // Content type is set explicitly with encoding and additional parameters on http response
+                    // Expected content type has charset and additional parameters
+                    {
                         null,
                         "text/bar; p1=p1-value; charset=us-ascii",
                         "text/bar; p1=p1-value; charset=us-ascii"
                     },
+
+                    // Content type set on action result takes precedence over the conten type set on http response
                     {
                         MediaTypeHeaderValue.Parse("text/foo; charset=us-ascii"),
                         "text/bar",
@@ -115,104 +138,6 @@ namespace Microsoft.AspNet.Mvc.Internal
             // Assert
             Assert.Equal(expectedContentType, resolvedContentType);
             Assert.Equal(Encoding.UTF8, resolvedContentTypeEncoding);
-        }
-
-        public static TheoryData<MediaTypeHeaderValue, string> ThrowsExceptionOnNullDefaultContentTypeData
-        {
-            get
-            {
-                return new TheoryData<MediaTypeHeaderValue, string>
-                {
-                    {
-                        null,
-                        null
-                    },
-                    {
-                        null,
-                        "text/default"
-                    },
-                    {
-                        new MediaTypeHeaderValue("text/default"),
-                        null
-                    },
-                    {
-                        new MediaTypeHeaderValue("text/default"),
-                        "text/default"
-                    }
-                };
-            }
-        }
-
-        [Theory]
-        [MemberData(nameof(ThrowsExceptionOnNullDefaultContentTypeData))]
-        public void ThrowsExceptionOn_NullDefaultContentType(
-            MediaTypeHeaderValue actionResultContentType,
-            string httpResponseContentType)
-        {
-            // Arrange, Act & Assert
-            var exception = Assert.Throws<ArgumentNullException>(() =>
-            {
-                string resolvedContentType = null;
-                Encoding resolvedContentTypeEncoding = null;
-                ResponseContentTypeHelper.ResolveContentTypeAndEncoding(
-                    actionResultContentType,
-                    httpResponseContentType,
-                    null, // default content type
-                    out resolvedContentType,
-                    out resolvedContentTypeEncoding);
-            });
-        }
-
-        public static TheoryData<MediaTypeHeaderValue, string> ThrowsExceptionOnNullDefaultContentTypeEncodingData
-        {
-            get
-            {
-                return new TheoryData<MediaTypeHeaderValue, string>
-                {
-                    {
-                        null,
-                        null
-                    },
-                    {
-                        null,
-                        "text/default"
-                    },
-                    {
-                        new MediaTypeHeaderValue("text/default"),
-                        null
-                    },
-                    {
-                        new MediaTypeHeaderValue("text/default"),
-                        "text/default"
-                    }
-                };
-            }
-        }
-
-        [Theory]
-        [MemberData(nameof(ThrowsExceptionOnNullDefaultContentTypeEncodingData))]
-        public void ThrowsExceptionOn_NullDefaultContentTypeEncoding(
-            MediaTypeHeaderValue actionResultContentType,
-            string httpResponseContentType)
-        {
-            // Arrange
-            var defaultContentType = MediaTypeHeaderValue.Parse("text/bar; p1=p1-value");
-
-            // Act & Assert
-            var exception = Assert.Throws<ArgumentException>(() =>
-            {
-                string resolvedContentType = null;
-                Encoding resolvedContentTypeEncoding = null;
-                ResponseContentTypeHelper.ResolveContentTypeAndEncoding(
-                    actionResultContentType,
-                    httpResponseContentType,
-                    defaultContentType,
-                    out resolvedContentType,
-                    out resolvedContentTypeEncoding);
-            });
-            Assert.Equal(
-                $"The default content type '{defaultContentType.ToString()}' must have an encoding.",
-                exception.Message);
         }
     }
 }

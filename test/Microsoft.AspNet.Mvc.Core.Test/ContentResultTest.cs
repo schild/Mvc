@@ -118,15 +118,15 @@ namespace Microsoft.AspNet.Mvc
                     {
                         null,
                         "abcd",
-                        "text/bar; p1=p1-value",
-                        "text/bar; p1=p1-value",
+                        "application/xml; charset=us-ascii",
+                        "application/xml; charset=us-ascii",
                         new byte[] { 97, 98, 99, 100 }
                     },
                     {
                         null,
                         "abcd",
-                        "application/xml; p1=p1-value; charset=us-ascii",
-                        "application/xml; p1=p1-value; charset=us-ascii",
+                        "Invalid content type",
+                        "Invalid content type",
                         new byte[] { 97, 98, 99, 100 }
                     },
                     {
