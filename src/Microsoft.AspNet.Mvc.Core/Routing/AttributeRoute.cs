@@ -116,9 +116,10 @@ namespace Microsoft.AspNet.Mvc.Routing
             var distinctRouteInfosByGroup = GroupRouteInfosByGroupId(routeInfos);
             foreach (var routeInfo in distinctRouteInfosByGroup)
             {
-                _routeBuilder.Add(new UrlMatchingEntry()
+                _routeBuilder.Add(new AttributeRouteMatchingEntry()
                 {
                     Order = routeInfo.Order,
+                    Precedence = routeInfo.Precedence,
                     Target = _target,
                     RouteName = routeInfo.Name,
                     RouteTemplate = TemplateParser.Parse(routeInfo.RouteTemplate),

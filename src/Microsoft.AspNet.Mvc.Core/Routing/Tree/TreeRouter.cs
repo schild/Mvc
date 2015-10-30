@@ -220,22 +220,25 @@ namespace Microsoft.AspNet.Mvc.Routing
         {
             foreach (var kvp in values)
             {
-                // This will replace the original value for the specified key.
-                // Values from the matched route will take preference over previous
-                // data in the route context.
-                destination[kvp.Key] = kvp.Value;
+                if (kvp.Value != null)
+                {
+                    // This will replace the original value for the specified key.
+                    // Values from the matched route will take preference over previous
+                    // data in the route context.
+                    destination[kvp.Key] = kvp.Value;
+                }
             }
         }
 
         private struct TemplateMatch : IEquatable<TemplateMatch>
         {
-            public TemplateMatch(UrlMatchingEntry entry, IDictionary<string, object> values)
+            public TemplateMatch(AttributeRouteMatchingEntry entry, IDictionary<string, object> values)
             {
                 Entry = entry;
                 Values = values;
             }
 
-            public UrlMatchingEntry Entry { get; }
+            public AttributeRouteMatchingEntry Entry { get; }
 
             public IDictionary<string, object> Values { get; }
 

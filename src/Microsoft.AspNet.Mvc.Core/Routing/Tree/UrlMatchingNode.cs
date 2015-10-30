@@ -12,14 +12,14 @@ namespace Microsoft.AspNet.Mvc.Routing
         {
             Length = length;
 
-            Matches = new List<UrlMatchingEntry>();
+            Matches = new List<AttributeRouteMatchingEntry>();
             Literals = new Dictionary<string, UrlMatchingNode>(StringComparer.OrdinalIgnoreCase);
         }
 
         public int Length { get; }
 
         // These entries need to be sorted by precedence then template
-        public List<UrlMatchingEntry> Matches { get; }
+        public List<AttributeRouteMatchingEntry> Matches { get; }
 
         public Dictionary<string, UrlMatchingNode> Literals { get; }
 

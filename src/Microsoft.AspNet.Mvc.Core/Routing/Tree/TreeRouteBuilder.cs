@@ -16,7 +16,7 @@ namespace Microsoft.AspNet.Mvc.Routing
     {
         private readonly IRouter _target;
         private readonly List<AttributeRouteLinkGenerationEntry> _generatingEntries;
-        private readonly List<UrlMatchingEntry> _matchingEntries;
+        private readonly List<AttributeRouteMatchingEntry> _matchingEntries;
 
         private readonly ILogger _logger;
         private readonly ILogger _constraintLogger;
@@ -25,7 +25,7 @@ namespace Microsoft.AspNet.Mvc.Routing
         {
             _target = target;
             _generatingEntries = new List<AttributeRouteLinkGenerationEntry>();
-            _matchingEntries = new List<UrlMatchingEntry>();
+            _matchingEntries = new List<AttributeRouteMatchingEntry>();
 
             _logger = routeLogger;
             _constraintLogger = constraintLogger;
@@ -36,7 +36,7 @@ namespace Microsoft.AspNet.Mvc.Routing
             _generatingEntries.Add(entry);
         }
 
-        public void Add(UrlMatchingEntry entry)
+        public void Add(AttributeRouteMatchingEntry entry)
         {
             _matchingEntries.Add(entry);
         }
@@ -72,7 +72,7 @@ namespace Microsoft.AspNet.Mvc.Routing
             _matchingEntries.Clear();
         }
 
-        private void AddEntryToTree(UrlMatchingTree tree, UrlMatchingEntry entry)
+        private void AddEntryToTree(UrlMatchingTree tree, AttributeRouteMatchingEntry entry)
         {
             var current = tree.Root;
             for (var i = 0; i < entry.RouteTemplate.Segments.Count; i++)
@@ -103,6 +103,12 @@ namespace Microsoft.AspNet.Mvc.Routing
 
                     current = next;
                     continue;
+                }
+
+                if (part.IsParameter && (part.IsOptional || part.IsCatchAll))
+                {
+                    current.Matches.Add(entry);
+                    current.Matches.Sort((x, y) => x.Precedence.CompareTo(y.Precedence));
                 }
 
                 if (part.IsParameter && part.InlineConstraints.Any() && !part.IsCatchAll)
@@ -153,11 +159,7 @@ namespace Microsoft.AspNet.Mvc.Routing
             }
 
             current.Matches.Add(entry);
-        }
-
-        public VirtualPathData GetVirtualPath(VirtualPathContext context)
-        {
-            throw new NotImplementedException();
+            current.Matches.Sort((x, y) => x.Precedence.CompareTo(y.Precedence));
         }
     }
 }
