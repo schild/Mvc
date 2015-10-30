@@ -79,65 +79,53 @@ namespace Microsoft.AspNet.Mvc.Routing
 
         public async Task RouteAsync(RouteContext context)
         {
-            var match = default(TemplateMatch);
             foreach (var tree in _trees)
             {
                 var tokenizer = new PathTokenizer(context.HttpContext.Request.Path);
                 var enumerator = tokenizer.GetEnumerator();
                 var current = tree.Root;
 
-                if ((match = Match(context, current, enumerator)) != default(TemplateMatch))
+                foreach (var match in Match(context, current, enumerator))
                 {
-                    break;
-                }
-            }
+                    var oldRouteData = context.RouteData;
 
-            if (match == default(TemplateMatch))
-            {
-                return;
-            }
+                    var newRouteData = new RouteData(oldRouteData);
 
-            var oldRouteData = context.RouteData;
+                    newRouteData.Routers.Add(match.Entry.Target);
+                    MergeValues(newRouteData.Values, match.Values);
 
-            var newRouteData = new RouteData(oldRouteData);
+                    if (!RouteConstraintMatcher.Match(
+                        match.Entry.Constraints,
+                        newRouteData.Values,
+                        context.HttpContext,
+                        this,
+                        RouteDirection.IncomingRequest,
+                        _constraintLogger))
+                    {
+                        return;
+                    }
 
+                    _logger.LogVerbose(
+                        "Request successfully matched the route with name '{RouteName}' and template '{RouteTemplate}'.",
+                        match.Entry.RouteName,
+                        match.Entry.RouteTemplate);
 
-            newRouteData.Routers.Add(match.Entry.Target);
-            MergeValues(newRouteData.Values, match.Values);
+                    context.RouteData = newRouteData;
 
-            if (!RouteConstraintMatcher.Match(
-                match.Entry.Constraints,
-                newRouteData.Values,
-                context.HttpContext,
-                this,
-                RouteDirection.IncomingRequest,
-                _constraintLogger))
-            {
-                return;
-            }
+                    await match.Entry.Target.RouteAsync(context);
 
-            _logger.LogVerbose(
-                "Request successfully matched the route with name '{RouteName}' and template '{RouteTemplate}'.",
-                match.Entry.RouteName,
-                match.Entry.RouteTemplate);
+                    if (context.IsHandled)
+                    {
+                        return;
+                    }
 
-            try
-            {
-                context.RouteData = newRouteData;
-
-                await match.Entry.Target.RouteAsync(context);
-            }
-            finally
-            {
-                // Restore the original values to prevent polluting the route data.
-                if (!context.IsHandled)
-                {
+                    // Restore the original values to prevent polluting the route data.
                     context.RouteData = oldRouteData;
                 }
             }
         }
 
-        private TemplateMatch Match(RouteContext context, UrlMatchingNode current, PathTokenizer.Enumerator enumerator)
+        private IEnumerable<TemplateMatch> Match(RouteContext context, UrlMatchingNode current, PathTokenizer.Enumerator enumerator)
         {
             if (!enumerator.MoveNext())
             {
@@ -150,11 +138,11 @@ namespace Microsoft.AspNet.Mvc.Routing
                     var values = match.TemplateMatcher.Match(context.HttpContext.Request.Path);
                     if (values != null)
                     {
-                        return new TemplateMatch(match, values);
+                        yield return new TemplateMatch(match, values);
                     }
                 }
 
-                return default(TemplateMatch);
+                yield break;
             }
 
             // Go through different types of matches in precedence order
@@ -167,51 +155,49 @@ namespace Microsoft.AspNet.Mvc.Routing
                 UrlMatchingNode next;
                 if (current.Literals.TryGetValue(segment, out next))
                 {
-                    var match = Match(context, next, enumerator);
-                    if (match != default(TemplateMatch))
+                    var matches = Match(context, next, enumerator);
+                    foreach (var match in matches)
                     {
-                        return match;
+                        yield return match;
                     }
                 }
             }
 
             if (current.ConstrainedParameters != null)
             {
-                var match = Match(context, current.ConstrainedParameters, enumerator);
-                if (match != default(TemplateMatch))
+                var matches = Match(context, current.ConstrainedParameters, enumerator);
+                foreach (var match in matches)
                 {
-                    return match;
+                    yield return match;
                 }
             }
 
             if (current.Parameters != null)
             {
-                var match = Match(context, current.Parameters, enumerator);
-                if (match != default(TemplateMatch))
+                var matches = Match(context, current.Parameters, enumerator);
+                foreach (var match in matches)
                 {
-                    return match;
+                    yield return match;
                 }
             }
 
             if (current.ConstrainedCatchAlls != null)
             {
-                var match = Match(context, current.ConstrainedCatchAlls, enumerator);
-                if (match != default(TemplateMatch))
+                var matches = Match(context, current.ConstrainedCatchAlls, enumerator);
+                foreach (var match in matches)
                 {
-                    return match;
+                    yield return match;
                 }
             }
 
             if (current.CatchAlls != null)
             {
-                var match = Match(context, current.CatchAlls, enumerator);
-                if (match != default(TemplateMatch))
+                var matches = Match(context, current.CatchAlls, enumerator);
+                foreach (var match in matches)
                 {
-                    return match;
+                    yield return match;
                 }
             }
-
-            return default(TemplateMatch);
         }
 
         private static void MergeValues(

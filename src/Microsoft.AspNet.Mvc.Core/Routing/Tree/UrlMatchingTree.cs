@@ -5,6 +5,13 @@ namespace Microsoft.AspNet.Mvc.Routing
 {
     public class UrlMatchingTree
     {
+        public UrlMatchingTree(int order)
+        {
+            Order = order;
+        }
+
+        public int Order { get; }
+
         public UrlMatchingNode Root { get; } = new UrlMatchingNode(length: 0);
     }
 }

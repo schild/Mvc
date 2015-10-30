@@ -50,7 +50,7 @@ namespace Microsoft.AspNet.Mvc.Routing
                 UrlMatchingTree tree;
                 if (!trees.TryGetValue(entry.Order, out tree))
                 {
-                    tree = new UrlMatchingTree();
+                    tree = new UrlMatchingTree(entry.Order);
                     trees.Add(entry.Order, tree);
                 }
 
