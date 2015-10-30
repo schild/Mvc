@@ -5,7 +5,9 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Linq;
+using Microsoft.AspNet.Mvc.Rendering;
 using Microsoft.AspNet.Mvc.Routing;
 using Microsoft.AspNet.Mvc.ViewEngines;
 using Microsoft.Extensions.OptionsModel;
@@ -21,7 +23,7 @@ namespace Microsoft.AspNet.Mvc.Razor
     /// </remarks>
     public class RazorViewEngine : IRazorViewEngine
     {
-        private const string ViewExtension = ".cshtml";
+        internal const string ViewExtension = ".cshtml";
         internal const string ControllerKey = "controller";
         internal const string AreaKey = "area";
 
@@ -233,14 +235,37 @@ namespace Microsoft.AspNet.Mvc.Razor
             string pageName,
             bool isPartial)
         {
-            if (IsApplicationRelativePath(pageName))
+            var applicationRelativePath = pageName;
+            if (!IsApplicationRelativePath(applicationRelativePath) && IsRelativePath(applicationRelativePath))
             {
-                var applicationRelativePath = pageName;
-                if (!pageName.EndsWith(ViewExtension, StringComparison.OrdinalIgnoreCase))
+                // Given a relative path (i.e. ending with ".cshtml") that is not yet application-relative (i.e.
+                // starting with "~/" or "/"), interpret given path relative to currently-executing view, if any.
+                var executingPath = (context as ViewContext)?.ExecutingFilePath;
+                if (!string.IsNullOrEmpty(executingPath))
                 {
-                    applicationRelativePath += ViewExtension;
+                    executingPath = Path.GetDirectoryName(executingPath);
                 }
 
+                if (string.IsNullOrEmpty(executingPath))
+                {
+                    // Not yet executing a view or current view is in app root. Start in app root ("~/").
+                    applicationRelativePath = "~/" + applicationRelativePath;
+                }
+                else if (executingPath.EndsWith("/", StringComparison.Ordinal) ||
+                    executingPath.EndsWith("\\", StringComparison.Ordinal))
+                {
+                    applicationRelativePath = executingPath + applicationRelativePath;
+                }
+                else
+                {
+                    applicationRelativePath = executingPath + "/" + applicationRelativePath;
+                }
+            }
+
+            // All paths starting with "~/" or "/" are valid application-relative paths. For example may have an
+            // extension other than ".cshtml".
+            if (IsApplicationRelativePath(applicationRelativePath))
+            {
                 var page = _pageFactory.CreateInstance(applicationRelativePath);
                 if (page != null)
                 {
@@ -360,6 +385,14 @@ namespace Microsoft.AspNet.Mvc.Razor
         {
             Debug.Assert(!string.IsNullOrEmpty(name));
             return name[0] == '~' || name[0] == '/';
+        }
+
+        private static bool IsRelativePath(string name)
+        {
+            Debug.Assert(!string.IsNullOrEmpty(name));
+
+            // Though ./ViewName looks like a relative path, framework searches for that view using view locations.
+            return name.EndsWith(ViewExtension, StringComparison.OrdinalIgnoreCase);
         }
     }
 }
