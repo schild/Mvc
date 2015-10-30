@@ -19,9 +19,10 @@ namespace Microsoft.AspNet.Mvc.Routing
         private readonly IRouter _target;
         private readonly IActionDescriptorsCollectionProvider _actionDescriptorsCollectionProvider;
         private readonly IInlineConstraintResolver _constraintResolver;
+        private readonly ILogger _routeLogger;
+        private readonly ILogger _constraintLogger;
 
-        private TreeRouter _router;
-        private TreeRouteBuilder _routeBuilder;
+        private volatile TreeRouter _router;
 
         public AttributeRoute(
             IRouter target,
@@ -53,10 +54,8 @@ namespace Microsoft.AspNet.Mvc.Routing
             _actionDescriptorsCollectionProvider = actionDescriptorsCollectionProvider;
             _constraintResolver = constraintResolver;
 
-            var routeLogger = loggerFactory.CreateLogger<TreeRouter>();
-            var constraintLogger = loggerFactory.CreateLogger(typeof(RouteConstraintMatcher).FullName);
-
-            _routeBuilder = new TreeRouteBuilder(_target, routeLogger, constraintLogger);
+            _routeLogger = loggerFactory.CreateLogger<TreeRouter>();
+            _constraintLogger = loggerFactory.CreateLogger(typeof(RouteConstraintMatcher).FullName);
         }
 
         /// <inheritdoc />
@@ -81,6 +80,7 @@ namespace Microsoft.AspNet.Mvc.Routing
             // it on startup.
             if (_router == null || _router.Version != actions.Version)
             {
+                System.Diagnostics.Debug.Assert(_router == null);
                 _router = BuildRoute(actions);
             }
 
@@ -89,13 +89,14 @@ namespace Microsoft.AspNet.Mvc.Routing
 
         private TreeRouter BuildRoute(ActionDescriptorsCollection actions)
         {
+            var routeBuilder = new TreeRouteBuilder(_target, _routeLogger, _constraintLogger);
             var routeInfos = GetRouteInfos(_constraintResolver, actions.Items);
 
             // We're creating one AttributeRouteGenerationEntry per action. This allows us to match the intended
             // action by expected route values, and then use the TemplateBinder to generate the link.
             foreach (var routeInfo in routeInfos)
             {
-                _routeBuilder.Add(new AttributeRouteLinkGenerationEntry()
+                routeBuilder.Add(new AttributeRouteLinkGenerationEntry()
                 {
                     Binder = new TemplateBinder(routeInfo.ParsedTemplate, routeInfo.Defaults),
                     Defaults = routeInfo.Defaults,
@@ -116,7 +117,7 @@ namespace Microsoft.AspNet.Mvc.Routing
             var distinctRouteInfosByGroup = GroupRouteInfosByGroupId(routeInfos);
             foreach (var routeInfo in distinctRouteInfosByGroup)
             {
-                _routeBuilder.Add(new AttributeRouteMatchingEntry()
+                routeBuilder.Add(new AttributeRouteMatchingEntry()
                 {
                     Order = routeInfo.Order,
                     Precedence = routeInfo.Precedence,
@@ -133,7 +134,7 @@ namespace Microsoft.AspNet.Mvc.Routing
                 });
             }
 
-            return _routeBuilder.Build(actions.Version);
+            return routeBuilder.Build(actions.Version);
         }
 
         private static IEnumerable<RouteInfo> GroupRouteInfosByGroupId(List<RouteInfo> routeInfos)
