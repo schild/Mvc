@@ -83,7 +83,7 @@ namespace Microsoft.AspNet.Mvc.Routing
                     // Treat complex segments as a constrained parameter
                     if (current.ConstrainedParameters == null)
                     {
-                        current.ConstrainedParameters = new UrlMatchingNode(length: i + 1);
+                        current.ConstrainedParameters = new UrlMatchingNode(current, length: i + 1);
                     }
 
                     current = current.ConstrainedParameters;
@@ -97,7 +97,7 @@ namespace Microsoft.AspNet.Mvc.Routing
                     UrlMatchingNode next;
                     if (!current.Literals.TryGetValue(part.Text, out next))
                     {
-                        next = new UrlMatchingNode(i + 1);
+                        next = new UrlMatchingNode(current, i + 1);
                         current.Literals.Add(part.Text, next);
                     }
 
@@ -115,7 +115,7 @@ namespace Microsoft.AspNet.Mvc.Routing
                 {
                     if (current.ConstrainedParameters == null)
                     {
-                        current.ConstrainedParameters = new UrlMatchingNode(length: i + 1);
+                        current.ConstrainedParameters = new UrlMatchingNode(current, length: i + 1);
                     }
 
                     current = current.ConstrainedParameters;
@@ -126,7 +126,7 @@ namespace Microsoft.AspNet.Mvc.Routing
                 {
                     if (current.Parameters == null)
                     {
-                        current.Parameters = new UrlMatchingNode(length: i + 1);
+                        current.Parameters = new UrlMatchingNode(current, length: i + 1);
                     }
 
                     current = current.Parameters;
@@ -137,7 +137,7 @@ namespace Microsoft.AspNet.Mvc.Routing
                 {
                     if (current.ConstrainedCatchAlls == null)
                     {
-                        current.ConstrainedCatchAlls = new UrlMatchingNode(length: i + 1);
+                        current.ConstrainedCatchAlls = new UrlMatchingNode(current, length: i + 1);
                     }
 
                     current = current.ConstrainedCatchAlls;
@@ -148,7 +148,7 @@ namespace Microsoft.AspNet.Mvc.Routing
                 {
                     if (current.CatchAlls == null)
                     {
-                        current.CatchAlls = new UrlMatchingNode(length: i + 1);
+                        current.CatchAlls = new UrlMatchingNode(current, length: i + 1);
                     }
 
                     current = current.CatchAlls;

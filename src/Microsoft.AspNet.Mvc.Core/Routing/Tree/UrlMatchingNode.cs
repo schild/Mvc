@@ -8,9 +8,10 @@ namespace Microsoft.AspNet.Mvc.Routing
 {
     public class UrlMatchingNode
     {
-        public UrlMatchingNode(int length)
+        public UrlMatchingNode(UrlMatchingNode parent, int length)
         {
             Length = length;
+            Parent = parent;
 
             Matches = new List<AttributeRouteMatchingEntry>();
             Literals = new Dictionary<string, UrlMatchingNode>(StringComparer.OrdinalIgnoreCase);
@@ -30,5 +31,7 @@ namespace Microsoft.AspNet.Mvc.Routing
         public UrlMatchingNode ConstrainedCatchAlls { get; set; }
 
         public UrlMatchingNode CatchAlls { get; set; }
+
+        public UrlMatchingNode Parent { get; }
     }
 }

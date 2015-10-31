@@ -80,7 +80,6 @@ namespace Microsoft.AspNet.Mvc.Routing
             // it on startup.
             if (_router == null || _router.Version != actions.Version)
             {
-                System.Diagnostics.Debug.Assert(_router == null);
                 _router = BuildRoute(actions);
             }
 

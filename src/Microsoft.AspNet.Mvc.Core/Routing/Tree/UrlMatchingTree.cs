@@ -12,6 +12,6 @@ namespace Microsoft.AspNet.Mvc.Routing
 
         public int Order { get; }
 
-        public UrlMatchingNode Root { get; } = new UrlMatchingNode(length: 0);
+        public UrlMatchingNode Root { get; } = new UrlMatchingNode(null, length: 0);
     }
 }
