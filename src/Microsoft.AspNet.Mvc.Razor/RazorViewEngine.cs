@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using Microsoft.AspNet.Mvc.Rendering;
 using Microsoft.AspNet.Mvc.Routing;
@@ -241,24 +240,17 @@ namespace Microsoft.AspNet.Mvc.Razor
                 // Given a relative path (i.e. ending with ".cshtml") that is not yet application-relative (i.e.
                 // starting with "~/" or "/"), interpret given path relative to currently-executing view, if any.
                 var executingPath = (context as ViewContext)?.ExecutingFilePath;
-                if (!string.IsNullOrEmpty(executingPath))
-                {
-                    executingPath = Path.GetDirectoryName(executingPath);
-                }
-
                 if (string.IsNullOrEmpty(executingPath))
                 {
                     // Not yet executing a view or current view is in app root. Start in app root ("~/").
                     applicationRelativePath = "~/" + applicationRelativePath;
                 }
-                else if (executingPath.EndsWith("/", StringComparison.Ordinal) ||
-                    executingPath.EndsWith("\\", StringComparison.Ordinal))
-                {
-                    applicationRelativePath = executingPath + applicationRelativePath;
-                }
                 else
                 {
-                    applicationRelativePath = executingPath + "/" + applicationRelativePath;
+                    // Get directory name but do not use Path.GetDirectoryName() to preserve path normalization.
+                    var index = executingPath.LastIndexOf('/');
+                    Debug.Assert(index >= 0);
+                    applicationRelativePath = executingPath.Substring(0, index + 1) + applicationRelativePath;
                 }
             }
 

@@ -2,12 +2,15 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Microsoft.AspNet.Http.Internal;
 using Microsoft.AspNet.Mvc.Abstractions;
+using Microsoft.AspNet.Mvc.ModelBinding;
 using Microsoft.AspNet.Mvc.Rendering;
 using Microsoft.AspNet.Mvc.Routing;
 using Microsoft.AspNet.Mvc.ViewEngines;
+using Microsoft.AspNet.Mvc.ViewFeatures;
 using Microsoft.AspNet.Routing;
 using Microsoft.AspNet.Testing;
 using Microsoft.Extensions.OptionsModel;
@@ -341,6 +344,227 @@ namespace Microsoft.AspNet.Mvc.Razor.Test
             var result = viewEngine.FindView(context, "test-view2");
 
             // Assert
+            pageFactory.Verify();
+        }
+
+        [Theory]
+        [InlineData("Test-View.cshtml")]
+        [InlineData("/Home/Test-View.cshtml")]
+        public void FindView_DoesNotUseViewLocationFormat_WithRelativePath_IfRouteDoesNotContainArea(string viewName)
+        {
+            // Arrange
+            var expectedViewName = "/Home/Test-View.cshtml";
+            var pageFactory = new Mock<IRazorPageFactory>();
+            var viewFactory = new Mock<IRazorViewFactory>();
+            var page = Mock.Of<IRazorPage>();
+            pageFactory
+                .Setup(p => p.CreateInstance(expectedViewName))
+                .Returns(page)
+                .Verifiable();
+
+            var viewEngine = new OverloadedLocationViewEngine(
+                pageFactory.Object,
+                viewFactory.Object,
+                GetOptionsAccessor(),
+                GetViewLocationCache());
+            var actionContext = GetActionContext(_controllerTestContext);
+            var context = new ViewContext(
+                actionContext,
+                Mock.Of<IView>(),
+                new ViewDataDictionary(new EmptyModelMetadataProvider()),
+                Mock.Of<ITempDataDictionary>(),
+                TextWriter.Null,
+                new HtmlHelperOptions())
+            {
+                ExecutingFilePath = "/Home/Page.cshtml",
+            };
+
+            viewFactory
+                .Setup(v => v.GetView(viewEngine, page, false))
+                .Returns(Mock.Of<IView>());
+
+            // Act
+            var result = viewEngine.FindView(context, viewName);
+
+            // Assert
+            Assert.True(result.Success);
+            Assert.Equal(viewName, result.ViewName);    // Result gets original view name.
+            pageFactory.Verify();
+        }
+
+        [Theory]
+        [InlineData("Test-View.cshtml")]
+        [InlineData("/Home/Test-View.cshtml")]
+        public void FindView_DoesNotUseViewLocationFormat_WithRelativePath_IfRouteContainArea(string viewName)
+        {
+            // Arrange
+            var expectedViewName = "/Home/Test-View.cshtml";
+            var pageFactory = new Mock<IRazorPageFactory>();
+            var viewFactory = new Mock<IRazorViewFactory>();
+            var page = Mock.Of<IRazorPage>();
+            pageFactory
+                .Setup(p => p.CreateInstance(expectedViewName))
+                .Returns(page)
+                .Verifiable();
+
+            var viewEngine = new OverloadedLocationViewEngine(
+                pageFactory.Object,
+                viewFactory.Object,
+                GetOptionsAccessor(),
+                GetViewLocationCache());
+            var actionContext = GetActionContext(_areaTestContext);
+            var context = new ViewContext(
+                actionContext,
+                Mock.Of<IView>(),
+                new ViewDataDictionary(new EmptyModelMetadataProvider()),
+                Mock.Of<ITempDataDictionary>(),
+                TextWriter.Null,
+                new HtmlHelperOptions())
+            {
+                ExecutingFilePath = "/Home/Page.cshtml",
+            };
+
+            viewFactory
+                .Setup(v => v.GetView(viewEngine, page, false))
+                .Returns(Mock.Of<IView>());
+
+            // Act
+            var result = viewEngine.FindView(context, viewName);
+
+            // Assert
+            Assert.True(result.Success);
+            Assert.Equal(viewName, result.ViewName);    // Result gets original view name.
+            pageFactory.Verify();
+        }
+
+        [Theory]
+        [InlineData("/Test-View.cshtml")]
+        [InlineData("~/Test-View.CSHTML")]
+        [InlineData("/Home/Test-View.CSHTML")]
+        [InlineData("~/Home/Test-View.cshtml")]
+        [InlineData("~/SHARED/TEST-VIEW.CSHTML")]
+        public void FindView_UsesGivenPath_WithAppRelativePath(string viewName)
+        {
+            // Arrange
+            var pageFactory = new Mock<IRazorPageFactory>();
+            var viewFactory = new Mock<IRazorViewFactory>();
+            var page = Mock.Of<IRazorPage>();
+            pageFactory
+                .Setup(p => p.CreateInstance(viewName))
+                .Returns(page)
+                .Verifiable();
+
+            var viewEngine = new OverloadedLocationViewEngine(
+                pageFactory.Object,
+                viewFactory.Object,
+                GetOptionsAccessor(),
+                GetViewLocationCache());
+            var actionContext = GetActionContext(_controllerTestContext);
+            var context = new ViewContext(
+                actionContext,
+                Mock.Of<IView>(),
+                new ViewDataDictionary(new EmptyModelMetadataProvider()),
+                Mock.Of<ITempDataDictionary>(),
+                TextWriter.Null,
+                new HtmlHelperOptions())
+            {
+                ExecutingFilePath = "/Home/Page.cshtml",
+            };
+
+            viewFactory
+                .Setup(v => v.GetView(viewEngine, page, false))
+                .Returns(Mock.Of<IView>());
+
+            // Act
+            var result = viewEngine.FindView(context, viewName);
+
+            // Assert
+            Assert.True(result.Success);
+            Assert.Equal(viewName, result.ViewName);    // Result gets original view name.
+            pageFactory.Verify();
+        }
+
+        [Theory]
+        [InlineData("Test-View.cshtml")]
+        [InlineData("Test-View.CSHTML")]
+        [InlineData("PATH/TEST-VIEW.CSHTML")]
+        [InlineData("Path1/Path2/Test-View.cshtml")]
+        public void FindView_ResolvesRelativeToCurrentPage_WithRelativePath(string viewName)
+        {
+            // Arrange
+            var expectedViewName = $"/Home/{ viewName }";
+            var pageFactory = new Mock<IRazorPageFactory>();
+            var viewFactory = new Mock<IRazorViewFactory>();
+            var page = Mock.Of<IRazorPage>();
+            pageFactory
+                .Setup(p => p.CreateInstance(expectedViewName))
+                .Returns(page)
+                .Verifiable();
+
+            var viewEngine = new OverloadedLocationViewEngine(
+                pageFactory.Object,
+                viewFactory.Object,
+                GetOptionsAccessor(),
+                GetViewLocationCache());
+            var actionContext = GetActionContext(_controllerTestContext);
+            var context = new ViewContext(
+                actionContext,
+                Mock.Of<IView>(),
+                new ViewDataDictionary(new EmptyModelMetadataProvider()),
+                Mock.Of<ITempDataDictionary>(),
+                TextWriter.Null,
+                new HtmlHelperOptions())
+            {
+                ExecutingFilePath = "/Home/Page.cshtml",
+            };
+
+            viewFactory
+                .Setup(v => v.GetView(viewEngine, page, false))
+                .Returns(Mock.Of<IView>());
+
+            // Act
+            var result = viewEngine.FindView(context, viewName);
+
+            // Assert
+            Assert.True(result.Success);
+            Assert.Equal(viewName, result.ViewName);    // Result gets original view name.
+            pageFactory.Verify();
+        }
+
+        [Theory]
+        [InlineData("Test-View.cshtml")]
+        [InlineData("Test-View.CSHTML")]
+        [InlineData("PATH/TEST-VIEW.CSHTML")]
+        [InlineData("Path1/Path2/Test-View.cshtml")]
+        public void FindView_ResolvesRelativeToAppRoot_WithRelativePath_IfNoPageExecuting(string viewName)
+        {
+            // Arrange
+            var expectedViewName = $"~/{ viewName }";
+            var pageFactory = new Mock<IRazorPageFactory>();
+            var viewFactory = new Mock<IRazorViewFactory>();
+            var page = Mock.Of<IRazorPage>();
+            pageFactory
+                .Setup(p => p.CreateInstance(expectedViewName))
+                .Returns(page)
+                .Verifiable();
+
+            var viewEngine = new OverloadedLocationViewEngine(
+                pageFactory.Object,
+                viewFactory.Object,
+                GetOptionsAccessor(),
+                GetViewLocationCache());
+            var context = GetActionContext(_controllerTestContext);
+
+            viewFactory
+                .Setup(v => v.GetView(viewEngine, page, false))
+                .Returns(Mock.Of<IView>());
+
+            // Act
+            var result = viewEngine.FindView(context, viewName);
+
+            // Assert
+            Assert.True(result.Success);
+            Assert.Equal(viewName, result.ViewName);    // Result gets original view name.
             pageFactory.Verify();
         }
 

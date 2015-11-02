@@ -173,20 +173,10 @@ namespace Microsoft.AspNet.Mvc.Razor
                     if (!string.IsNullOrEmpty(layout) && !IsApplicationRelativePath(layout) && IsRelativePath(layout))
                     {
                         // Fix up relative layout to be app-relative. Interpret layout relative to this view start.
-                        var path = System.IO.Path.GetDirectoryName(viewStart.Path);
-                        if (string.IsNullOrEmpty(path))
-                        {
-                            layout = "~/" + layout;
-                        }
-                        else if (path.EndsWith("/", StringComparison.Ordinal) ||
-                            path.EndsWith("\\", StringComparison.Ordinal))
-                        {
-                            layout = path + layout;
-                        }
-                        else
-                        {
-                            layout = path + "/" + layout;
-                        }
+                        // Get directory name but do not use Path.GetDirectoryName() to preserve path normalization.
+                        var index = viewStart.Path.LastIndexOf('/');
+                        Debug.Assert(index >= 0);
+                        layout = viewStart.Path.Substring(0, index + 1) + layout;
                     }
                 }
             }
@@ -232,7 +222,17 @@ namespace Microsoft.AspNet.Mvc.Razor
                     throw new InvalidOperationException(message);
                 }
 
-                var layoutPage = GetLayoutPage(context, previousPage.Layout);
+                var layout = previousPage.Layout;
+                if (!IsApplicationRelativePath(layout) && IsRelativePath(layout))
+                {
+                    // Fix up relative layout to be app-relative. Interpret layout relative to previous page.
+                    // Get directory name but do not use Path.GetDirectoryName() to preserve path normalization.
+                    var index = previousPage.Path.LastIndexOf('/');
+                    Debug.Assert(index >= 0);
+                    layout = previousPage.Path.Substring(0, index + 1) + layout;
+                }
+
+                var layoutPage = GetLayoutPage(context, layout);
 
                 if (renderedLayouts.Count > 0 &&
                     renderedLayouts.Any(l => string.Equals(l.Path, layoutPage.Path, StringComparison.Ordinal)))
