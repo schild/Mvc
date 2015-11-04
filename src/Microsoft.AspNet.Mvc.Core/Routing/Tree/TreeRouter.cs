@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -85,118 +86,151 @@ namespace Microsoft.AspNet.Mvc.Routing
                 var enumerator = tokenizer.GetEnumerator();
                 var current = tree.Root;
 
-                foreach (var match in Match(context, current, enumerator))
+                var treeEnumerator = new TreeEnumerator(current, tokenizer);
+
+                while(treeEnumerator.MoveNext())
                 {
-                    var oldRouteData = context.RouteData;
-
-                    var newRouteData = new RouteData(oldRouteData);
-
-                    newRouteData.Routers.Add(match.Entry.Target);
-                    MergeValues(newRouteData.Values, match.Values);
-
-                    if (!RouteConstraintMatcher.Match(
-                        match.Entry.Constraints,
-                        newRouteData.Values,
-                        context.HttpContext,
-                        this,
-                        RouteDirection.IncomingRequest,
-                        _constraintLogger))
+                    var node = treeEnumerator.Current;
+                    foreach (var item in node.Matches)
                     {
-                        return;
+                        // We may want to build something more efficient than TemplateMatcher.
+                        // We already test all the literals, and that the shape matches, and that doesn't
+                        // need to be redone.
+                        var values = item.TemplateMatcher.Match(context.HttpContext.Request.Path);
+                        if (values == null)
+                        {
+                            continue;
+                        }
+
+                        var match = new TemplateMatch(item, values);
+
+                        var oldRouteData = context.RouteData;
+
+                        var newRouteData = new RouteData(oldRouteData);
+
+                        newRouteData.Routers.Add(match.Entry.Target);
+                        MergeValues(newRouteData.Values, match.Values);
+
+                        if (!RouteConstraintMatcher.Match(
+                            match.Entry.Constraints,
+                            newRouteData.Values,
+                            context.HttpContext,
+                            this,
+                            RouteDirection.IncomingRequest,
+                            _constraintLogger))
+                        {
+                            return;
+                        }
+
+                        _logger.LogVerbose(
+                            "Request successfully matched the route with name '{RouteName}' and template '{RouteTemplate}'.",
+                            match.Entry.RouteName,
+                            match.Entry.RouteTemplate);
+
+                        context.RouteData = newRouteData;
+
+                        await match.Entry.Target.RouteAsync(context);
+
+                        if (context.IsHandled)
+                        {
+                            return;
+                        }
+
+                        // Restore the original values to prevent polluting the route data.
+                        context.RouteData = oldRouteData;
                     }
-
-                    _logger.LogVerbose(
-                        "Request successfully matched the route with name '{RouteName}' and template '{RouteTemplate}'.",
-                        match.Entry.RouteName,
-                        match.Entry.RouteTemplate);
-
-                    context.RouteData = newRouteData;
-
-                    await match.Entry.Target.RouteAsync(context);
-
-                    if (context.IsHandled)
-                    {
-                        return;
-                    }
-
-                    // Restore the original values to prevent polluting the route data.
-                    context.RouteData = oldRouteData;
                 }
             }
         }
 
-        private IEnumerable<TemplateMatch> Match(RouteContext context, UrlMatchingNode current, PathTokenizer.Enumerator enumerator)
+        private struct TreeEnumerator : IEnumerator<UrlMatchingNode>
         {
-            if (!enumerator.MoveNext())
+            private readonly Stack<UrlMatchingNode> _stack;
+            private readonly PathTokenizer _tokenizer;
+
+            private int _segmentIndex;
+
+            public TreeEnumerator(UrlMatchingNode root, PathTokenizer tokenizer)
             {
-                // We've reached the end of the Path. Check the matches.
-                foreach (var match in current.Matches)
+                _stack = new Stack<UrlMatchingNode>();
+                _tokenizer = tokenizer;
+                Current = null;
+                _segmentIndex = -1;
+
+                _stack.Push(root);
+            }
+
+            public UrlMatchingNode Current { get; private set; }
+
+            object IEnumerator.Current => Current;
+
+            public void Dispose()
+            {
+            }
+
+            public bool MoveNext()
+            {
+                if (_stack == null)
                 {
-                    // We may want to build something more efficient than TemplateMatcher.
-                    // We already test all the literals, and that the shape matches, and that doesn't
-                    // need to be redone.
-                    var values = match.TemplateMatcher.Match(context.HttpContext.Request.Path);
-                    if (values != null)
+                    return false;
+                }
+
+                while (_stack.Count > 0)
+                {
+                    var next = _stack.Pop();
+                    if (++_segmentIndex >= _tokenizer.Count)
                     {
-                        yield return new TemplateMatch(match, values);
+                        _segmentIndex--;
+                        if (next.Matches.Count > 0)
+                        {
+                            Current = next;
+                            return true;
+                        }
+                    }
+
+                    if (_tokenizer.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    if (next.CatchAlls != null)
+                    {
+                        _stack.Push(next.CatchAlls);
+                    }
+
+                    if (next.ConstrainedCatchAlls != null)
+                    {
+                        _stack.Push(next.ConstrainedCatchAlls);
+                    }
+
+                    if (next.Parameters != null)
+                    {
+                        _stack.Push(next.Parameters);
+                    }
+
+                    if (next.ConstrainedParameters != null)
+                    {
+                        _stack.Push(next.ConstrainedParameters);
+                    }
+
+                    if (next.Literals.Count > 0)
+                    {
+                        UrlMatchingNode node;
+                        if (next.Literals.TryGetValue(_tokenizer[_segmentIndex].Value, out node))
+                        {
+                            _stack.Push(node);
+                        }
                     }
                 }
 
-                yield break;
+                return false;
             }
 
-            // Go through different types of matches in precedence order
-            if (current.Literals.Count > 0)
+            public void Reset()
             {
-                // This code needs to use PathSegment to avoid allocations. I'd recommend a binary search
-                // with a list. This is left as an exercise to the reader.
-                var segment = enumerator.Current.ToString();
-
-                UrlMatchingNode next;
-                if (current.Literals.TryGetValue(segment, out next))
-                {
-                    var matches = Match(context, next, enumerator);
-                    foreach (var match in matches)
-                    {
-                        yield return match;
-                    }
-                }
-            }
-
-            if (current.ConstrainedParameters != null)
-            {
-                var matches = Match(context, current.ConstrainedParameters, enumerator);
-                foreach (var match in matches)
-                {
-                    yield return match;
-                }
-            }
-
-            if (current.Parameters != null)
-            {
-                var matches = Match(context, current.Parameters, enumerator);
-                foreach (var match in matches)
-                {
-                    yield return match;
-                }
-            }
-
-            if (current.ConstrainedCatchAlls != null)
-            {
-                var matches = Match(context, current.ConstrainedCatchAlls, enumerator);
-                foreach (var match in matches)
-                {
-                    yield return match;
-                }
-            }
-
-            if (current.CatchAlls != null)
-            {
-                var matches = Match(context, current.CatchAlls, enumerator);
-                foreach (var match in matches)
-                {
-                    yield return match;
-                }
+                _stack.Clear();
+                Current = null;
+                _segmentIndex = -1;
             }
         }
 
