@@ -22,6 +22,7 @@ namespace Microsoft.AspNet.Mvc.ModelBinding.Validation
         private string _key;
         private object _model;
         private ModelMetadata _metadata;
+        private ModelValidatorProviderContext _context;
         private IValidationStrategy _strategy;
 
         private HashSet<object> _currentPath;
@@ -93,7 +94,7 @@ namespace Microsoft.AspNet.Mvc.ModelBinding.Validation
             var state = _modelState.GetValidationState(_key);
             if (state == ModelValidationState.Unvalidated)
             {
-                var validators = GetValidators(_metadata);
+                var validators = GetValidators();
 
                 var count = validators.Count;
                 if (count > 0)
@@ -254,11 +255,21 @@ namespace Microsoft.AspNet.Mvc.ModelBinding.Validation
             return isValid;
         }
 
-        private IList<IModelValidator> GetValidators(ModelMetadata metadata)
+        private IList<IModelValidator> GetValidators()
         {
-            var context = new ModelValidatorProviderContext(metadata);
-            _validatorProvider.GetValidators(context);
-            return context.Validators;
+            if (_context == null)
+            {
+                _context = new ModelValidatorProviderContext(_metadata);
+            }
+            else
+            {
+                _context.ModelMetadata = _metadata;
+                _context.Validators.Clear();
+            }
+
+            _validatorProvider.GetValidators(_context);
+
+            return _context.Validators;
         }
 
         private void SuppressValidation(string key)

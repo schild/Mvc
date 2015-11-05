@@ -1,9 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
-using System;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.OptionsModel;
@@ -43,13 +41,19 @@ namespace Microsoft.AspNet.Mvc.ModelBinding.Validation
                     _stringLocalizerFactory);
             }
 
-            foreach (var attribute in context.ValidatorMetadata.OfType<ValidationAttribute>())
+            foreach (var item in context.ValidatorMetadata)
             {
+                var attribute = item as ValidationAttribute;
+                if (attribute == null)
+                {
+                    continue;
+                }
+
                 var validator = new DataAnnotationsModelValidator(attribute, stringLocalizer);
 
                 // Inserts validators based on whether or not they are 'required'. We want to run
                 // 'required' validators first so that we get the best possible error message.
-                if (validator.IsRequired)
+                if (attribute is RequiredAttribute)
                 {
                     context.Validators.Insert(0, validator);
                 }
