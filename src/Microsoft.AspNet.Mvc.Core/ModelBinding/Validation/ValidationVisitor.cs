@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace Microsoft.AspNet.Mvc.ModelBinding.Validation
@@ -259,7 +258,7 @@ namespace Microsoft.AspNet.Mvc.ModelBinding.Validation
         {
             var context = new ModelValidatorProviderContext(metadata);
             _validatorProvider.GetValidators(context);
-            return context.Validators.OrderBy(v => v, ValidatorOrderComparer.Instance).ToList();
+            return context.Validators;
         }
 
         private void SuppressValidation(string key)
@@ -346,20 +345,6 @@ namespace Microsoft.AspNet.Mvc.ModelBinding.Validation
                 _visitor._strategy = _strategy;
 
                 _visitor._currentPath.Remove(_newModel);
-            }
-        }
-
-        // Sorts validators based on whether or not they are 'required'. We want to run
-        // 'required' validators first so that we get the best possible error message.
-        private class ValidatorOrderComparer : IComparer<IModelValidator>
-        {
-            public static readonly ValidatorOrderComparer Instance = new ValidatorOrderComparer();
-
-            public int Compare(IModelValidator x, IModelValidator y)
-            {
-                var xScore = x.IsRequired ? 0 : 1;
-                var yScore = y.IsRequired ? 0 : 1;
-                return xScore.CompareTo(yScore);
             }
         }
     }

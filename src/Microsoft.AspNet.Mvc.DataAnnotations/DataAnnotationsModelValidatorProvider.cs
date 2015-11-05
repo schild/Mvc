@@ -45,7 +45,18 @@ namespace Microsoft.AspNet.Mvc.ModelBinding.Validation
 
             foreach (var attribute in context.ValidatorMetadata.OfType<ValidationAttribute>())
             {
-                context.Validators.Add(new DataAnnotationsModelValidator(attribute, stringLocalizer));
+                var validator = new DataAnnotationsModelValidator(attribute, stringLocalizer);
+
+                // Inserts validators based on whether or not they are 'required'. We want to run
+                // 'required' validators first so that we get the best possible error message.
+                if (validator.IsRequired)
+                {
+                    context.Validators.Insert(0, validator);
+                }
+                else
+                {
+                    context.Validators.Add(validator);
+                }
             }
 
             // Produce a validator if the type supports IValidatableObject

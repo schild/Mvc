@@ -175,7 +175,7 @@ namespace Microsoft.AspNet.Mvc.ModelBinding.Validation
             {
                 get
                 {
-                    throw new NotImplementedException();
+                    return false;
                 }
             }
 

@@ -21,7 +21,16 @@ namespace Microsoft.AspNet.Mvc.ModelBinding.Validation
                 var validator = context.ValidatorMetadata[i] as IModelValidator;
                 if (validator != null)
                 {
-                    context.Validators.Add(validator);
+                    // Inserts validators based on whether or not they are 'required'. We want to run
+                    // 'required' validators first so that we get the best possible error message.
+                    if (validator.IsRequired)
+                    {
+                        context.Validators.Insert(0, validator);
+                    }
+                    else
+                    {
+                        context.Validators.Add(validator);
+                    }
                 }
             }
         }
