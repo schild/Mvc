@@ -41,9 +41,9 @@ namespace Microsoft.AspNet.Mvc.ModelBinding.Validation
                     _stringLocalizerFactory);
             }
 
-            foreach (var item in context.ValidatorMetadata)
+            for (var i = 0; i < context.ValidatorMetadata.Count; i++)
             {
-                var attribute = item as ValidationAttribute;
+                var attribute = context.ValidatorMetadata[i] as ValidationAttribute;
                 if (attribute == null)
                 {
                     continue;

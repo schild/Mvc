@@ -39,6 +39,29 @@ namespace Microsoft.AspNet.Mvc.ModelBinding.Validation
 #endif
 
         [Fact]
+        public void GetValidators_InsertsRequiredValidatorsFirst()
+        {
+            var provider = new DataAnnotationsModelValidatorProvider(
+                new TestOptionsManager<MvcDataAnnotationsLocalizationOptions>(),
+                stringLocalizerFactory: null);
+            var metadata = _metadataProvider.GetMetadataForProperty(
+                typeof(ClassWithProperty),
+                "PropertyWithMultipleValidationAttributes");
+
+            var providerContext = new ModelValidatorProviderContext(metadata);
+
+            // Act
+            provider.GetValidators(providerContext);
+
+            // Assert
+            Assert.Equal(4, providerContext.Validators.Count);
+            Assert.IsType<CustomRequiredAttribute2>((providerContext.Validators[0] as DataAnnotationsModelValidator).Attribute);
+            Assert.IsType<CustomRequiredAttribute1>((providerContext.Validators[1] as DataAnnotationsModelValidator).Attribute);
+            Assert.IsType<CustomNonRequiredAttribute1>((providerContext.Validators[2] as DataAnnotationsModelValidator).Attribute);
+            Assert.IsType<CustomNonRequiredAttribute2>((providerContext.Validators[3] as DataAnnotationsModelValidator).Attribute);
+        }
+
+        [Fact]
         public void UnknownValidationAttributeGetsDefaultAdapter()
         {
             // Arrange
@@ -129,6 +152,31 @@ namespace Microsoft.AspNet.Mvc.ModelBinding.Validation
             public int WithAttribute { get; set; }
 
             public int WithoutAttribute { get; set; }
+        }
+
+        private class ClassWithProperty
+        {
+            [CustomNonRequiredAttribute1]
+            [CustomNonRequiredAttribute2]
+            [CustomRequiredAttribute1]
+            [CustomRequiredAttribute2]
+            public string PropertyWithMultipleValidationAttributes { get; set; }
+        }
+
+        public class CustomRequiredAttribute1 : RequiredAttribute
+        {
+        }
+
+        public class CustomRequiredAttribute2 : RequiredAttribute
+        {
+        }
+
+        public class CustomNonRequiredAttribute1 : ValidationAttribute
+        {
+        }
+
+        public class CustomNonRequiredAttribute2 : ValidationAttribute
+        {
         }
     }
 }

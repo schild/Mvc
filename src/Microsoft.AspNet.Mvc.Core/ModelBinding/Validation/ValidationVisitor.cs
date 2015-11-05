@@ -263,6 +263,7 @@ namespace Microsoft.AspNet.Mvc.ModelBinding.Validation
             }
             else
             {
+                // Reusing the context to improve performance.
                 _context.ModelMetadata = _metadata;
                 _context.Validators.Clear();
             }
