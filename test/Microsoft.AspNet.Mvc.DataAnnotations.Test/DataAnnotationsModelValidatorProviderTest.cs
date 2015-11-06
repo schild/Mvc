@@ -55,8 +55,8 @@ namespace Microsoft.AspNet.Mvc.ModelBinding.Validation
 
             // Assert
             Assert.Equal(4, providerContext.Validators.Count);
-            Assert.IsAssignableFrom<RequiredAttribute>((providerContext.Validators[0] as DataAnnotationsModelValidator).Attribute);
-            Assert.IsAssignableFrom<RequiredAttribute>((providerContext.Validators[1] as DataAnnotationsModelValidator).Attribute);
+            Assert.IsAssignableFrom<RequiredAttribute>(((DataAnnotationsModelValidator) providerContext.Validators[0]).Attribute);
+            Assert.IsAssignableFrom<RequiredAttribute>(((DataAnnotationsModelValidator)providerContext.Validators[1]).Attribute);
         }
 
         [Fact]
