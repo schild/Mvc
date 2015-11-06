@@ -55,10 +55,8 @@ namespace Microsoft.AspNet.Mvc.ModelBinding.Validation
 
             // Assert
             Assert.Equal(4, providerContext.Validators.Count);
-            Assert.IsType<CustomRequiredAttribute2>((providerContext.Validators[0] as DataAnnotationsModelValidator).Attribute);
-            Assert.IsType<CustomRequiredAttribute1>((providerContext.Validators[1] as DataAnnotationsModelValidator).Attribute);
-            Assert.IsType<CustomNonRequiredAttribute1>((providerContext.Validators[2] as DataAnnotationsModelValidator).Attribute);
-            Assert.IsType<CustomNonRequiredAttribute2>((providerContext.Validators[3] as DataAnnotationsModelValidator).Attribute);
+            Assert.IsAssignableFrom<RequiredAttribute>((providerContext.Validators[0] as DataAnnotationsModelValidator).Attribute);
+            Assert.IsAssignableFrom<RequiredAttribute>((providerContext.Validators[1] as DataAnnotationsModelValidator).Attribute);
         }
 
         [Fact]
