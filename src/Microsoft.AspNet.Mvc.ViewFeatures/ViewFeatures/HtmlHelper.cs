@@ -542,7 +542,16 @@ namespace Microsoft.AspNet.Mvc.ViewFeatures
 
             var newViewData = new ViewDataDictionary(baseViewData, model);
 
-            var viewEngineResult = _viewEngine.FindPartialView(ViewContext, partialViewName);
+            ViewEngineResult viewEngineResult;
+            if (CompositeViewEngine.IsPagePath(partialViewName))
+            {
+                viewEngineResult = _viewEngine.GetView(ViewContext.ExecutingFilePath, partialViewName, isPartial: true);
+            }
+            else
+            {
+                viewEngineResult = _viewEngine.FindView(ViewContext, partialViewName, isPartial: true);
+            }
+
             if (!viewEngineResult.Success)
             {
                 var locations = string.Empty;

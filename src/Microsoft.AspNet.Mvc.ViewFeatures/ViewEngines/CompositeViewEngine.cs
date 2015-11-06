@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Microsoft.Extensions.OptionsModel;
 
@@ -11,6 +12,8 @@ namespace Microsoft.AspNet.Mvc.ViewEngines
     /// <inheritdoc />
     public class CompositeViewEngine : ICompositeViewEngine
     {
+        private const string ViewExtension = ".cshtml";
+
         /// <summary>
         /// Initializes a new instance of <see cref="CompositeViewEngine"/>.
         /// </summary>
@@ -23,62 +26,69 @@ namespace Microsoft.AspNet.Mvc.ViewEngines
         /// <inheritdoc />
         public IReadOnlyList<IViewEngine> ViewEngines { get; }
 
-        /// <inheritdoc />
-        public ViewEngineResult FindPartialView(
-            ActionContext context,
-            string partialViewName)
+        /// <summary>
+        /// Determine if given name should be interpreted as a page path.
+        /// </summary>
+        /// <param name="name">Name of or path to a page.</param>
+        /// <returns><c>true</c> if the given <paramref name="name"/> appears to be a path to a page.</returns>
+        public static bool IsPagePath(string name)
         {
-            if (context == null)
-            {
-                throw new ArgumentNullException(nameof(context));
-            }
+            Debug.Assert(!string.IsNullOrEmpty(name));
 
-            if (partialViewName == null)
-            {
-                throw new ArgumentNullException(nameof(partialViewName));
-            }
-
-            return FindView(context, partialViewName, partial: true);
+            // A page path starts with "~" or "/" (if absolute) or ends with ".cshtml" (if relative).
+            return name[0] == '~' ||
+                name[0] == '/' ||
+                name.EndsWith(ViewExtension, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <inheritdoc />
-        public ViewEngineResult FindView(
-            ActionContext context,
-            string viewName)
+        public ViewEngineResult FindView(ActionContext context, string viewName, bool isPartial)
         {
-            if (context == null)
-            {
-                throw new ArgumentNullException(nameof(context));
-            }
-
-            if (viewName == null)
-            {
-                throw new ArgumentNullException(nameof(viewName));
-            }
-
-            return FindView(context, viewName, partial: false);
-        }
-
-        private ViewEngineResult FindView(
-            ActionContext context,
-            string viewName,
-            bool partial)
-        {
-            var searchedLocations = Enumerable.Empty<string>();
+            List<string> searchedLocations = null;
             foreach (var engine in ViewEngines)
             {
-                var result = partial ? engine.FindPartialView(context, viewName) :
-                                       engine.FindView(context, viewName);
-
+                var result = engine.FindView(context, viewName, isPartial);
                 if (result.Success)
                 {
                     return result;
                 }
 
-                searchedLocations = searchedLocations.Concat(result.SearchedLocations);
+                if (searchedLocations == null)
+                {
+                    searchedLocations = new List<string>(result.SearchedLocations);
+                }
+                else
+                {
+                    searchedLocations.AddRange(result.SearchedLocations);
+                }
             }
 
             return ViewEngineResult.NotFound(viewName, searchedLocations);
+        }
+
+        /// <inheritdoc />
+        public ViewEngineResult GetView(string executingFilePath, string viewPath, bool isPartial)
+        {
+            List<string> searchedLocations = null;
+            foreach (var engine in ViewEngines)
+            {
+                var result = engine.GetView(executingFilePath, viewPath, isPartial);
+                if (result.Success)
+                {
+                    return result;
+                }
+
+                if (searchedLocations == null)
+                {
+                    searchedLocations = new List<string>(result.SearchedLocations);
+                }
+                else
+                {
+                    searchedLocations.AddRange(result.SearchedLocations);
+                }
+            }
+
+            return ViewEngineResult.NotFound(viewPath, searchedLocations);
         }
     }
 }

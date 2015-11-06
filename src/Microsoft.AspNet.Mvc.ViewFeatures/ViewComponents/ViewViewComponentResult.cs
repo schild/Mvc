@@ -76,16 +76,16 @@ namespace Microsoft.AspNet.Mvc.ViewComponents
                 throw new ArgumentNullException(nameof(context));
             }
 
-            var viewEngine = ViewEngine ?? ResolveViewEngine(context);
+            var viewContext = context.ViewContext;
             var viewData = ViewData ?? context.ViewData;
+            var viewEngine = ViewEngine ?? ResolveViewEngine(context);
             var isNullOrEmptyViewName = string.IsNullOrEmpty(ViewName);
 
-            string qualifiedViewName;
-            if (!isNullOrEmptyViewName &&
-                (ViewName[0] == '~' || ViewName[0] == '/'))
+            ViewEngineResult result;
+            if (!isNullOrEmptyViewName && CompositeViewEngine.IsPagePath(ViewName))
             {
-                // View name that was passed in is already a rooted path, the view engine will handle this.
-                qualifiedViewName = ViewName;
+                // View name that was passed in is already a path, the view engine will handle this.
+                result = viewEngine.GetView(viewContext.ExecutingFilePath, ViewName, isPartial: true);
             }
             else
             {
@@ -101,40 +101,30 @@ namespace Microsoft.AspNet.Mvc.ViewComponents
                 //
                 // This supports a controller or area providing an override for component views.
                 var viewName = isNullOrEmptyViewName ? DefaultViewName : ViewName;
-
-                qualifiedViewName = string.Format(
+                var qualifiedViewName = string.Format(
                     CultureInfo.InvariantCulture,
                     ViewPathFormat,
                     context.ViewComponentDescriptor.ShortName,
                     viewName);
+
+                result = viewEngine.FindView(viewContext, viewName, isPartial: true);
             }
 
-            var view = FindView(context.ViewContext, viewEngine, qualifiedViewName);
-
-            var childViewContext = new ViewContext(
-                context.ViewContext,
-                view,
-                ViewData ?? context.ViewData,
-                context.Writer);
-
+            var view = result.EnsureSuccessful().View;
             using (view as IDisposable)
             {
                 if (_diagnosticSource == null)
                 {
-                    _diagnosticSource = context.ViewContext.HttpContext.RequestServices.GetRequiredService<DiagnosticSource>();
+                    _diagnosticSource = viewContext.HttpContext.RequestServices.GetRequiredService<DiagnosticSource>();
                 }
 
                 _diagnosticSource.ViewComponentBeforeViewExecute(context, view);
 
+                var childViewContext = new ViewContext(viewContext, view, ViewData ?? context.ViewData, context.Writer);
                 await view.RenderAsync(childViewContext);
 
                 _diagnosticSource.ViewComponentAfterViewExecute(context, view);
             }
-        }
-
-        private static IView FindView(ActionContext context, IViewEngine viewEngine, string viewName)
-        {
-            return viewEngine.FindPartialView(context, viewName).EnsureSuccessful().View;
         }
 
         private static IViewEngine ResolveViewEngine(ViewComponentContext context)

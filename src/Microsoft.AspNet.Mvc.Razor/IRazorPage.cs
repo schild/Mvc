@@ -46,6 +46,12 @@ namespace Microsoft.AspNet.Mvc.Razor
         string Layout { get; set; }
 
         /// <summary>
+        /// Gets or sets the <see cref="Path"/> value when <see cref="Layout"/> was set. Framework sets this property
+        /// automatically. Should rarely need to be set from user code.
+        /// </summary>
+        string PathWhenLayoutSet { get; set; }
+
+        /// <summary>
         /// Gets or sets a value that determines if the current instance of <see cref="IRazorPage"/> is being executed
         /// from a partial view.
         /// </summary>

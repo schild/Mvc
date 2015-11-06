@@ -111,7 +111,7 @@ namespace Microsoft.AspNet.Mvc.ViewFeatures.Internal
             {
                 var fullViewName = modeViewPath + "/" + viewName;
 
-                var viewEngineResult = _viewEngine.FindPartialView(_viewContext, fullViewName);
+                var viewEngineResult = _viewEngine.FindView(_viewContext, fullViewName, isPartial: true);
                 if (viewEngineResult.Success)
                 {
                     using (var writer = new StringCollectionTextWriter(_viewContext.Writer.Encoding))

@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
-using Microsoft.AspNet.Mvc.Rendering;
 using Microsoft.AspNet.Mvc.Routing;
 using Microsoft.AspNet.Mvc.ViewEngines;
 using Microsoft.Extensions.OptionsModel;
@@ -22,7 +21,7 @@ namespace Microsoft.AspNet.Mvc.Razor
     /// </remarks>
     public class RazorViewEngine : IRazorViewEngine
     {
-        internal const string ViewExtension = ".cshtml";
+        private const string ViewExtension = ".cshtml";
         internal const string ControllerKey = "controller";
         internal const string AreaKey = "area";
 
@@ -96,62 +95,6 @@ namespace Microsoft.AspNet.Mvc.Razor
         public virtual IEnumerable<string> AreaViewLocationFormats
         {
             get { return _areaViewLocationFormats; }
-        }
-
-        /// <inheritdoc />
-        public ViewEngineResult FindView(
-            ActionContext context,
-            string viewName)
-        {
-            if (context == null)
-            {
-                throw new ArgumentNullException(nameof(context));
-            }
-
-            if (string.IsNullOrEmpty(viewName))
-            {
-                throw new ArgumentException(Resources.ArgumentCannotBeNullOrEmpty, nameof(viewName));
-            }
-
-            var pageResult = GetRazorPageResult(context, viewName, isPartial: false);
-            return CreateViewEngineResult(pageResult, _viewFactory, isPartial: false);
-        }
-
-        /// <inheritdoc />
-        public ViewEngineResult FindPartialView(
-            ActionContext context,
-            string partialViewName)
-        {
-            if (context == null)
-            {
-                throw new ArgumentNullException(nameof(context));
-            }
-
-            if (string.IsNullOrEmpty(partialViewName))
-            {
-                throw new ArgumentException(Resources.ArgumentCannotBeNullOrEmpty, nameof(partialViewName));
-            }
-
-            var pageResult = GetRazorPageResult(context, partialViewName, isPartial: true);
-            return CreateViewEngineResult(pageResult, _viewFactory, isPartial: true);
-        }
-
-        /// <inheritdoc />
-        public RazorPageResult FindPage(
-            ActionContext context,
-            string pageName)
-        {
-            if (context == null)
-            {
-                throw new ArgumentNullException(nameof(context));
-            }
-
-            if (string.IsNullOrEmpty(pageName))
-            {
-                throw new ArgumentException(Resources.ArgumentCannotBeNullOrEmpty, nameof(pageName));
-            }
-
-            return GetRazorPageResult(context, pageName, isPartial: true);
         }
 
         /// <summary>
@@ -229,47 +172,100 @@ namespace Microsoft.AspNet.Mvc.Razor
             return stringRouteValue;
         }
 
-        private RazorPageResult GetRazorPageResult(
-            ActionContext context,
-            string pageName,
-            bool isPartial)
+        /// <summary>
+        /// Determine if given name should be interpreted as a page path.
+        /// </summary>
+        /// <param name="name">Name of or path to a page.</param>
+        /// <returns><c>true</c> if the given <paramref name="name"/> appears to be a path to a page.</returns>
+        public static bool IsPagePath(string name)
         {
-            var applicationRelativePath = pageName;
-            if (!IsApplicationRelativePath(applicationRelativePath) && IsRelativePath(applicationRelativePath))
+            Debug.Assert(!string.IsNullOrEmpty(name));
+
+            // A page path starts with "~" or "/" (if absolute) or ends with ".cshtml" (if relative).
+            return IsApplicationRelativePath(name) || IsRelativePath(name);
+        }
+
+
+        /// <inheritdoc />
+        public RazorPageResult FindPage(ActionContext context, string pageName, bool isPartial)
+        {
+            if (context == null)
             {
-                // Given a relative path (i.e. ending with ".cshtml") that is not yet application-relative (i.e.
-                // starting with "~/" or "/"), interpret given path relative to currently-executing view, if any.
-                var executingPath = (context as ViewContext)?.ExecutingFilePath;
-                if (string.IsNullOrEmpty(executingPath))
+                throw new ArgumentNullException(nameof(context));
+            }
+
+            if (string.IsNullOrEmpty(pageName))
+            {
+                throw new ArgumentException(Resources.ArgumentCannotBeNullOrEmpty, nameof(pageName));
+            }
+
+            return LocatePageFromViewLocations(context, pageName, isPartial);
+        }
+
+        /// <inheritdoc />
+        public RazorPageResult GetPage(string executingFilePath, string pagePath, bool isPartial)
+        {
+            if (string.IsNullOrEmpty(pagePath))
+            {
+                throw new ArgumentException(Resources.ArgumentCannotBeNullOrEmpty, nameof(pagePath));
+            }
+
+            var applicationRelativePath = pagePath;
+            if (!IsApplicationRelativePath(applicationRelativePath))
+            {
+                // Given a relative path i.e. not yet application-relative (starting with "~/" or "/"), interpret
+                // path relative to currently-executing view, if any.
+                if (string.IsNullOrEmpty(executingFilePath))
                 {
-                    // Not yet executing a view or current view is in app root. Start in app root ("~/").
+                    // Not yet executing a view. Start in app root ("~/").
                     applicationRelativePath = "~/" + applicationRelativePath;
                 }
                 else
                 {
                     // Get directory name but do not use Path.GetDirectoryName() to preserve path normalization.
-                    var index = executingPath.LastIndexOf('/');
+                    var index = executingFilePath.LastIndexOf('/');
                     Debug.Assert(index >= 0);
-                    applicationRelativePath = executingPath.Substring(0, index + 1) + applicationRelativePath;
+                    applicationRelativePath = executingFilePath.Substring(0, index + 1) + applicationRelativePath;
                 }
             }
 
-            // All paths starting with "~/" or "/" are valid application-relative paths. For example may have an
-            // extension other than ".cshtml".
-            if (IsApplicationRelativePath(applicationRelativePath))
+            var page = _pageFactory.CreateInstance(applicationRelativePath);
+            if (page != null)
             {
-                var page = _pageFactory.CreateInstance(applicationRelativePath);
-                if (page != null)
-                {
-                    return new RazorPageResult(pageName, page);
-                }
+                page.IsPartial = isPartial;
+                return new RazorPageResult(pagePath, page);
+            }
 
-                return new RazorPageResult(pageName, new[] { pageName });
-            }
-            else
+            return new RazorPageResult(pagePath, new[] { applicationRelativePath });
+        }
+
+        /// <inheritdoc />
+        public ViewEngineResult FindView(ActionContext context, string viewName, bool isPartial)
+        {
+            if (context == null)
             {
-                return LocatePageFromViewLocations(context, pageName, isPartial);
+                throw new ArgumentNullException(nameof(context));
             }
+
+            if (string.IsNullOrEmpty(viewName))
+            {
+                throw new ArgumentException(Resources.ArgumentCannotBeNullOrEmpty, nameof(viewName));
+            }
+
+            var pageResult = FindPage(context, viewName, isPartial);
+            return CreateViewEngineResult(pageResult, _viewFactory, isPartial);
+        }
+
+        /// <inheritdoc />
+        public ViewEngineResult GetView(string executingFilePath, string viewPath, bool isPartial)
+        {
+            if (string.IsNullOrEmpty(viewPath))
+            {
+                throw new ArgumentException(Resources.ArgumentCannotBeNullOrEmpty, nameof(viewPath));
+            }
+
+            var pageResult = GetPage(executingFilePath, viewPath, isPartial);
+            return CreateViewEngineResult(pageResult, _viewFactory, isPartial);
         }
 
         private RazorPageResult LocatePageFromViewLocations(
@@ -297,7 +293,7 @@ namespace Microsoft.AspNet.Mvc.Razor
                 }
             }
 
-            // 2. With the values that we've accumumlated so far, check if we have a cached result.
+            // 2. With the values that we've accumulated so far, check if we have a cached result.
             IEnumerable<string> locationsToSearch = null;
             var cachedResult = _viewLocationCache.Get(expanderContext);
             if (!cachedResult.Equals(ViewLocationCacheResult.None))
@@ -348,6 +344,7 @@ namespace Microsoft.AspNet.Mvc.Razor
                 {
                     // 3a. We found a page. Cache the set of values that produced it and return a found result.
                     _viewLocationCache.Set(expanderContext, new ViewLocationCacheResult(path, searchedLocations));
+                    page.IsPartial = isPartial;
                     return new RazorPageResult(pageName, page);
                 }
 

@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Encodings.Web;
@@ -157,6 +156,7 @@ namespace Microsoft.AspNet.Mvc.Razor
             var viewStarts = _viewStartProvider.GetViewStartPages(RazorPage.Path);
 
             string layout = null;
+            string pathWhenLayoutSet = null;
             var oldFilePath = context.ExecutingFilePath;
             try
             {
@@ -164,20 +164,15 @@ namespace Microsoft.AspNet.Mvc.Razor
                 {
                     context.ExecutingFilePath = viewStart.Path;
 
-                    // Copy the layout value from the previous view start (if any) to the current.
+                    // Copy the layout values from the previous view start (if any) to the current. Do not change the
+                    // order of these assignments since Layout setter may update PathWhenLayoutSet.
                     viewStart.Layout = layout;
+                    viewStart.PathWhenLayoutSet = pathWhenLayoutSet;
 
                     await RenderPageCoreAsync(viewStart, context);
 
                     layout = viewStart.Layout;
-                    if (!string.IsNullOrEmpty(layout) && !IsApplicationRelativePath(layout) && IsRelativePath(layout))
-                    {
-                        // Fix up relative layout to be app-relative. Interpret layout relative to this view start.
-                        // Get directory name but do not use Path.GetDirectoryName() to preserve path normalization.
-                        var index = viewStart.Path.LastIndexOf('/');
-                        Debug.Assert(index >= 0);
-                        layout = viewStart.Path.Substring(0, index + 1) + layout;
-                    }
+                    pathWhenLayoutSet = viewStart.PathWhenLayoutSet;
                 }
             }
             finally
@@ -185,20 +180,10 @@ namespace Microsoft.AspNet.Mvc.Razor
                 context.ExecutingFilePath = oldFilePath;
             }
 
-            // Copy over interesting properties from the ViewStart page to the entry page.
+            // Copy over interesting properties from the ViewStart page to the entry page. Do not change the order of
+            // these assignments since Layout setter may update PathWhenLayoutSet.
             RazorPage.Layout = layout;
-        }
-
-        private static bool IsApplicationRelativePath(string name)
-        {
-            Debug.Assert(!string.IsNullOrEmpty(name));
-            return name[0] == '~' || name[0] == '/';
-        }
-
-        private static bool IsRelativePath(string name)
-        {
-            Debug.Assert(!string.IsNullOrEmpty(name));
-            return name.EndsWith(RazorViewEngine.ViewExtension, StringComparison.OrdinalIgnoreCase);
+            RazorPage.PathWhenLayoutSet = pathWhenLayoutSet;
         }
 
         private async Task RenderLayoutAsync(
@@ -222,17 +207,7 @@ namespace Microsoft.AspNet.Mvc.Razor
                     throw new InvalidOperationException(message);
                 }
 
-                var layout = previousPage.Layout;
-                if (!IsApplicationRelativePath(layout) && IsRelativePath(layout))
-                {
-                    // Fix up relative layout to be app-relative. Interpret layout relative to previous page.
-                    // Get directory name but do not use Path.GetDirectoryName() to preserve path normalization.
-                    var index = previousPage.Path.LastIndexOf('/');
-                    Debug.Assert(index >= 0);
-                    layout = previousPage.Path.Substring(0, index + 1) + layout;
-                }
-
-                var layoutPage = GetLayoutPage(context, layout);
+                var layoutPage = GetLayoutPage(context, previousPage.PathWhenLayoutSet, previousPage.Layout);
 
                 if (renderedLayouts.Count > 0 &&
                     renderedLayouts.Any(l => string.Equals(l.Path, layoutPage.Path, StringComparison.Ordinal)))
@@ -267,13 +242,22 @@ namespace Microsoft.AspNet.Mvc.Razor
             }
         }
 
-        private IRazorPage GetLayoutPage(ViewContext context, string layoutPath)
+        private IRazorPage GetLayoutPage(ViewContext context, string pathWhenLayoutSet, string layoutPath)
         {
-            var layoutPageResult = _viewEngine.FindPage(context, layoutPath);
+            RazorPageResult layoutPageResult;
+            if (RazorViewEngine.IsPagePath(layoutPath))
+            {
+                layoutPageResult = _viewEngine.GetPage(pathWhenLayoutSet, layoutPath, isPartial: true);
+            }
+            else
+            {
+                layoutPageResult = _viewEngine.FindPage(context, layoutPath, isPartial: true);
+            }
+
             if (layoutPageResult.Page == null)
             {
-                var locations = Environment.NewLine +
-                                string.Join(Environment.NewLine, layoutPageResult.SearchedLocations);
+                var locations =
+                    Environment.NewLine + string.Join(Environment.NewLine, layoutPageResult.SearchedLocations);
                 throw new InvalidOperationException(Resources.FormatLayoutCannotBeLocated(layoutPath, locations));
             }
 
